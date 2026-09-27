@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Start a fresh, independent role chat; no inherited transcript or global memory.
+set -euo pipefail
+scionbook_repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+if [[ $# -ne 1 ]]; then
+  echo "Usage: $0 session|maintainer" >&2
+  exit 2
+fi
+case "$1" in
+  session)
+    scionbook_sandbox=read-only
+    scionbook_approval=never
+    scionbook_prompt='Use $start-session from .agents/skills/start-session/SKILL.md. You are the Session Planner. Keep all new gameplay progress in this conversation and never write files or request escalation.'
+    ;;
+  maintainer)
+    scionbook_sandbox=workspace-write
+    scionbook_approval=on-request
+    scionbook_prompt='Use $start-maintenance from .agents/skills/start-maintenance/SKILL.md. You are the Repository Maintainer. Use only this chat and repository files; do not retrieve or contact gameplay chats.'
+    ;;
+  *)
+    echo "Usage: $0 session|maintainer" >&2
+    exit 2
+    ;;
+esac
+exec codex --cd "$scionbook_repo_root"   --sandbox "$scionbook_sandbox" --ask-for-approval "$scionbook_approval"   --config agents.enabled=false   --config memories.generate_memories=false --config memories.use_memories=false   --search "$scionbook_prompt"

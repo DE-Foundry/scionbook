@@ -1,0 +1,35 @@
+# Development caches and credentials.
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+.DS_Store
+.env
+.env.*
+
+# Persistent player state, including nested copies and suffix backups
+# such as status.json.bak, scionbook.json.tmp, or cleanup.md~.
+scionbook.json*
+status.json*
+cleanup.md*
+quest_history.md*
+quest_mats.json*
+quest_turnins.json*
+SCIONBOOK_MEMORY.md*
+SCIONBOOK_DAILY_WEEKLY_CHECKLIST.md*
+
+# Only the neutral source templates belong in Git.
+!/templates/SCIONBOOK_MEMORY.md
+!/templates/SCIONBOOK_DAILY_WEEKLY_CHECKLIST.md
+
+# Refresh/handoff staging, atomic local-data writes, and raw page dumps.
+.scionbook-*
+raw/
+
+# Custom persistent outputs, exports, backups, and repository-local caches.
+/local/
+/.cache/
+/cache/
+
+# Synthetic test fixtures must remain trackable, including snapshot filenames.
+!tests/fixtures/**

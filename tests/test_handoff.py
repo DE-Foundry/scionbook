@@ -1,0 +1,253 @@
+"""Confirmed transitions without launching live agents or reading chat storage."""
+import io
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+from types import SimpleNamespace
+
+import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import scionbook_handoff as handoff
+
+
+@pytest.mark.parametrize("recap", ["", "   ", "x" * (handoff.MAX_RECAP + 1)])
+def test_invalid_recap_never_starts_an_agent_or_creates_staging(tmp_path, monkeypatch, recap):
+    monkeypatch.setattr(handoff.subprocess, "run", lambda *a, **k: pytest.fail("agent started"))
+    with pytest.raises(ValueError):
+        handoff.apply_recap(recap, tmp_path)
+    assert not list(tmp_path.iterdir())
+
+
+def fake_apply(monkeypatch, receipt=None, code=0, raw=None):
+    calls = []
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+        result = Path(command[command.index("--output-last-message") + 1])
+        if raw is not None:
+            result.write_text(raw)
+        elif receipt is not None:
+            result.write_text(json.dumps(receipt))
+        return SimpleNamespace(returncode=code)
+    monkeypatch.setattr(handoff.subprocess, "run", run)
+    return calls
+
+
+def test_apply_pipes_only_approved_recap_and_checks_receipt(tmp_path, monkeypatch):
+    recap = "What's worth saving: Item $(touch do-not-run); `echo no`; new line\nMore reports"
+    receipt = {"status": "applied", "summary": "Saved verified reports."}
+    calls = fake_apply(monkeypatch, receipt)
+    monkeypatch.setenv("LODESTONE_COOKIE", "test-only-value")
+    assert handoff.apply_recap(recap, tmp_path) == receipt
+    command, kwargs = calls[0]
+    assert "exec" in command and "--ephemeral" in command and command[-1] == "-"
+    assert not any(word in command for word in ("resume", "fork", "--last"))
+    assert recap not in " ".join(command)
+    assert json.dumps(recap, ensure_ascii=False) in kwargs["input"]
+    assert "LODESTONE_COOKIE" not in kwargs["env"]
+    assert command[command.index("--sandbox") + 1] == "workspace-write"
+    assert command[command.index("--ask-for-approval") + 1] == "never"
+    assert "memories.use_memories=false" in command
+    assert "memories.generate_memories=false" in command
+    assert "agents.enabled=false" in command
+    assert not list((tmp_path / ".scionbook-tmp").iterdir())
+
+
+@pytest.mark.parametrize("receipt", [
+    {"status": "needs_input", "summary": "Confirm the session date."},
+    {"status": "failed", "summary": "Write failed."},
+    {"status": "pending", "summary": "Not applied."},
+    {"status": "applied", "summary": None}, [],
+])
+def test_non_success_or_invalid_receipt_stops_handoff(tmp_path, monkeypatch, receipt):
+    fake_apply(monkeypatch, receipt)
+    with pytest.raises(RuntimeError, match="stopped"):
+        handoff.apply_recap("Approved recap", tmp_path)
+    assert not list((tmp_path / ".scionbook-tmp").iterdir())
+
+
+@pytest.mark.parametrize("raw", [None, "not JSON"])
+def test_missing_or_malformed_result_is_not_success(tmp_path, monkeypatch, raw):
+    fake_apply(monkeypatch, raw=raw)
+    with pytest.raises(RuntimeError, match="could not be verified"):
+        handoff.apply_recap("Approved recap", tmp_path)
+
+
+def test_nonzero_exit_is_failure_even_with_success_receipt(tmp_path, monkeypatch):
+    fake_apply(monkeypatch, {"status": "applied", "summary": "Claims success"}, code=1)
+    with pytest.raises(RuntimeError, match="failed"):
+        handoff.apply_recap("Approved recap", tmp_path)
+
+
+def test_no_confirmation_never_checks_terminal_or_launches(monkeypatch):
+    monkeypatch.setattr(handoff, "open_terminal", lambda: pytest.fail("opened terminal"))
+    with pytest.raises(SystemExit) as error:
+        handoff.main(["recap"])
+    assert error.value.code == 2
+
+
+def test_no_terminal_stops_before_applying(monkeypatch):
+    monkeypatch.setattr(handoff.shutil, "which", lambda _: "/fake/tool")
+    def no_terminal():
+        raise OSError("No terminal")
+    monkeypatch.setattr(handoff, "open_terminal", no_terminal)
+    monkeypatch.setattr(handoff, "apply_recap", lambda *a: pytest.fail("applied"))
+    with pytest.raises(SystemExit) as error:
+        handoff.main(["recap", "--confirmed"])
+    assert error.value.code == 1
+
+
+def mock_terminal(monkeypatch):
+    monkeypatch.setattr(handoff.shutil, "which", lambda _: "/fake/tool")
+    monkeypatch.setattr(handoff, "open_terminal", lambda: io.StringIO())
+
+
+@pytest.mark.parametrize("status", ["applied", "unchanged"])
+def test_success_applies_then_starts_maintainer_without_payload(monkeypatch, status):
+    mock_terminal(monkeypatch)
+    events = []
+    monkeypatch.setattr(sys, "stdin", io.StringIO("Only approved recap"))
+    def apply(text):
+        events.append(("apply", text))
+        return {"status": status, "summary": "Done"}
+    def start(role, terminal):
+        events.append(("start", role))
+        return 0
+    monkeypatch.setattr(handoff, "apply_recap", apply)
+    monkeypatch.setattr(handoff, "start_chat", start)
+    handoff.main(["recap", "--confirmed"])
+    assert events == [("apply", "Only approved recap"), ("start", "maintainer")]
+
+
+def test_apply_failure_does_not_launch_or_retry(monkeypatch):
+    mock_terminal(monkeypatch)
+    monkeypatch.setattr(sys, "stdin", io.StringIO("Approved recap"))
+    calls = []
+    def fail(text):
+        calls.append(text)
+        raise RuntimeError("Needs clarification")
+    monkeypatch.setattr(handoff, "apply_recap", fail)
+    monkeypatch.setattr(handoff, "start_chat", lambda *a: pytest.fail("started chat"))
+    with pytest.raises(SystemExit) as error:
+        handoff.main(["recap", "--confirmed"])
+    assert error.value.code == 1
+    assert calls == ["Approved recap"]
+
+
+def test_session_transition_only_starts_session(monkeypatch):
+    mock_terminal(monkeypatch)
+    monkeypatch.setattr(handoff, "apply_recap", lambda *a: pytest.fail("applied recap"))
+    calls = []
+    monkeypatch.setattr(handoff, "start_chat", lambda role, terminal: calls.append(role) or 0)
+    handoff.main(["session", "--confirmed"])
+    assert calls == ["session"]
+
+
+def test_launch_failure_is_reported(monkeypatch):
+    mock_terminal(monkeypatch)
+    monkeypatch.setattr(handoff, "start_chat", lambda *a: 3)
+    with pytest.raises(SystemExit) as error:
+        handoff.main(["session", "--confirmed"])
+    assert error.value.code == 3
+
+
+@pytest.mark.parametrize("role,sandbox,approval,skill", [
+    ("session", "read-only", "never", "$start-session"),
+    ("maintainer", "workspace-write", "on-request", "$start-maintenance"),
+])
+def test_actual_launcher_uses_new_context_and_role_permissions(tmp_path, role, sandbox, approval, skill):
+    # Execute the real Bash launcher with a fake codex executable; no live agent.
+    executable = tmp_path / "codex"
+    executable.write_text("#!/bin/sh\nprintf '%s\\n' \"$@\"\n")
+    executable.chmod(0o755)
+    environment = {**os.environ, "PATH": str(tmp_path) + os.pathsep + os.environ["PATH"]}
+    result = subprocess.run(["bash", str(handoff.REPO / "scripts" / "scionbook-chat"), role],
+                            env=environment, text=True, capture_output=True, check=True)
+    args = result.stdout.splitlines()
+    assert args[args.index("--sandbox") + 1] == sandbox
+    assert args[args.index("--ask-for-approval") + 1] == approval
+    assert skill in args[-1]
+    assert not any(value in args for value in ("resume", "fork", "--last"))
+    assert "memories.use_memories=false" in args
+    assert "agents.enabled=false" in args
+
+
+@pytest.mark.parametrize('role,skill', [('session', 'start-session'), ('maintainer', 'start-maintenance'), ('apply', 'apply-recap')])
+def test_app_draft_encodes_exact_workspace_and_skill_without_launch(tmp_path, monkeypatch, role, skill):
+    from urllib.parse import urlsplit, parse_qs
+    repo = tmp_path / 'A repo & #? ü'
+    repo.mkdir()
+    monkeypatch.setattr(handoff.subprocess, 'run', lambda *a, **k: pytest.fail('launched agent'))
+    url = urlsplit(handoff.app_draft_link(role, repo))
+    assert url.scheme == 'codex' and url.netloc == 'threads' and url.path == '/new'
+    params = parse_qs(url.query)
+    assert set(params) == {'path', 'prompt'}
+    assert params['path'] == [str(repo.resolve())]
+    prompt = params['prompt'][0]
+    if role == 'apply':
+        assert prompt.startswith('Use $apply-recap from .agents/skills/apply-recap/SKILL.md.')
+        assert 'After verifying' in prompt and '$start-maintenance' in prompt
+        assert 'missing' in prompt and 'fails' in prompt
+        assert prompt.endswith('Recap to apply:\n')
+    else:
+        assert prompt == f'Use ${skill} from .agents/skills/{skill}/SKILL.md.'
+    assert not url.fragment
+
+
+@pytest.mark.parametrize('role', ['session', 'apply', 'maintainer'])
+def test_draft_needs_no_confirmation_terminal_or_cli(monkeypatch, capsys, role):
+    monkeypatch.setattr(handoff, 'open_terminal', lambda: pytest.fail('terminal opened'))
+    monkeypatch.setattr(handoff.shutil, 'which', lambda *a: pytest.fail('CLI probed'))
+    monkeypatch.setattr(handoff, 'apply_recap', lambda *a: pytest.fail('saved recap'))
+    handoff.main(['draft', '--role', role])
+    assert capsys.readouterr().out.startswith('codex://threads/new?')
+
+
+def test_draft_rejects_non_directory_workspace(tmp_path):
+    file = tmp_path / 'file'
+    file.write_text('not a workspace')
+    with pytest.raises(ValueError, match='directory'):
+        handoff.app_draft_link('session', file)
+
+
+def test_apply_and_followup_drafts_do_not_read_or_transfer_recap(monkeypatch, capsys):
+    from urllib.parse import urlsplit, parse_qs
+    class NoRead:
+        def read(self, *args):
+            pytest.fail('Draft generation read a recap')
+    monkeypatch.setattr(sys, 'stdin', NoRead())
+    monkeypatch.setattr(handoff, 'apply_recap', lambda *a: pytest.fail('Recap was applied'))
+    handoff.main(['draft', '--role', 'apply'])
+    apply = parse_qs(urlsplit(capsys.readouterr().out.strip()).query)['prompt'][0]
+    assert apply.endswith('Recap to apply:\n')
+    handoff.main(['draft', '--role', 'maintainer'])
+    followup = parse_qs(urlsplit(capsys.readouterr().out.strip()).query)['prompt'][0]
+    assert followup == 'Use $start-maintenance from .agents/skills/start-maintenance/SKILL.md.'
+
+
+@pytest.mark.parametrize("role,skill", [
+    ("session", "start-session"), ("maintainer", "start-maintenance"), ("apply", "apply-recap"),
+])
+def test_portable_prompt_needs_no_client_files_or_recap(monkeypatch, capsys, role, skill):
+    def forbidden(*args, **kwargs):
+        pytest.fail("Portable prompt attempted a side effect or private input access")
+    monkeypatch.setattr(handoff.subprocess, "run", forbidden)
+    monkeypatch.setattr(handoff.shutil, "which", forbidden)
+    monkeypatch.setattr(handoff, "open_terminal", forbidden)
+    monkeypatch.setattr(handoff, "apply_recap", forbidden)
+    monkeypatch.setattr(Path, "read_text", forbidden)
+    monkeypatch.setattr(Path, "write_text", forbidden)
+    monkeypatch.setattr(sys, "stdin", SimpleNamespace(read=forbidden))
+    handoff.main(["prompt", "--role", role])
+    output = capsys.readouterr().out
+    assert f".agents/skills/{skill}/SKILL.md" in output
+    assert "codex" not in output.lower()
+    if role == "apply":
+        assert output.rstrip().endswith("Recap to apply:")
+
+
+def test_portable_prompt_rejects_unknown_role():
+    with pytest.raises(ValueError, match="Unknown prompt role"):
+        handoff.portable_prompt("unknown")
