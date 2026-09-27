@@ -1,0 +1,7 @@
+# Use the user's account/model settings. Independent chats share files only.
+[agents]
+enabled = false
+
+[memories]
+generate_memories = false
+use_memories = false

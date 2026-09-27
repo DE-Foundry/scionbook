@@ -1,0 +1,81 @@
+# Project Standards
+
+## Shared code and local state
+
+The project name is Scionbook. Product-owned modules, commands, configuration, staging, and cache paths
+use scionbook; FFXIV refers to the game or upstream resources. Roles are Session Planner and Repository Maintainer.
+There are no compatibility aliases for unreleased project names.
+One character per checkout. No hardcoded character, server, retainer, account, platform, timezone,
+progression tier, or remote repository. Setup resolves identity and saves scionbook.json locally.
+Shared instructions and skills describe behavior; snapshots, reports, preferences, and progress do not
+belong in them. Tracked templates are neutral. Fixtures use synthetic data, never account page dumps.
+Default player-state filenames, nested copies, and suffix backups stay ignored; only the exact neutral
+memory/checklist templates and synthetic tests/fixtures/ are exceptions. Never store player data in fixtures. Keep custom-named persistent outputs and exports under ignored
+local/, and refresh staging under .scionbook-tmp/. Add ignore coverage when introducing a new storage path.
+All command-line examples run from the repository root. English Lodestone markup is supported through the fixed NA English website endpoint, independent of
+character home World. Other regional/localized endpoints are not validated. Keep the endpoint and
+Scionbook/1.0 request identity in scionbook_http.py; never impersonate a browser.
+
+## Source fidelity
+
+Check status.json's fetched_at_utc, notes, and still_not_available. Authentication requires evidence
+from private pages, not just a cookie-presence flag. Never treat unavailable fields as zero or completion.
+Validate new snapshots and matching reports before replacing prior sources. Full private quest history
+must have a known total equal to the retained entry count. Do not generate a fake zero history for public mode.
+Preserve newer player reports with source/date attribution. No scrape is implied by a recap save.
+Infer unfinished crafting class quests from job levels plus complete quest history and verified quest-chain
+references. Label them as inferred, not accepted Journal steps; explicit player reports take precedence.
+The inventory-cleanup skill owns this procedure and the resulting material-protection coverage.
+Persist crafting quest research/keeps in quest_turnins.json and generated protections/reasons/recipe cache
+in quest_mats.json. Reuse saved references; sync reconciles against levels and completed history. Do not
+keep the authoritative material list in chat or prose memory. A level increase alone never completes a quest.
+
+## Workflow boundaries
+
+Python data tools must not depend on an AI provider or model API. Shared Markdown workflows support
+explicit file-based invocation without native skill syntax. Manual prompt/recap handoffs are the portable
+baseline; client-specific configuration, URL schemes, permission flags, and launchers are optional adapters
+documented under docs/integrations/. Never apply one client's controls to another or claim a text prompt
+enforces permissions. Document capability limits instead of claiming universal client compatibility.
+
+Session and Maintainer chats remain independent. After showing a recap, offer the available confirmed
+apply-to-Maintainer handoff; after successful sync, offer a fresh Session Planner. Draft links require user
+submission; supported full-launch transports run only after explicit Yes. Forward only the approved recap to apply; subsequent startup uses local files and
+no old transcript. Check transport before asking; optional Codex desktop deep links prepare a fresh composer but do not
+send the prompt or select permissions. Apply drafts also require the user to paste the recap. The destination
+Apply Recap chat provides the follow-up draft only after a verified save. Disclose those steps upfront. Use docs/chat-handoffs.md. Neither
+compaction, resume/fork, nor invoking a different skill resets context. Runtime permissions still apply.
+Specialist skills own detailed cleanup, market, gearing, and hunt procedures. Core instructions route to them.
+Hunt plans default to practical travel order, grouping nearby suitable targets and separating skipped or
+conditional marks; verify travel dependencies and state the proposed start when the current location is unknown.
+Personal preferences belong in scionbook.json or dated local memory, not shared skill text.
+Never commit or push on sync unless the user separately established that policy for their private checkout.
+
+## Inventory and market recommendations
+
+Each market-board listing holds at most 99 items, or the item's lower stack limit. Distinguish total stock
+from per-listing quantities and count each split listing against its retainer's available slots. Smaller
+stacks are a valid selling strategy; weigh demand and value per slot rather than always consolidating.
+Retainers sell only on the configured character's home World. Other World/DC prices support comparison,
+buying, or a provisional home-World listing price when local pricing is missing. Label such a fallback
+“Non-home-World price” with its source; never present it as verified home-World pricing or proceeds, infer
+local sale speed from it, or recommend the source World/DC as a selling destination.
+Missing market prices do not erase a known vendor sale value. Compare provisional DC references against
+vendor proceeds too; any resulting proceeds estimate is vendor-only. NPC purchase prices trigger a warning
+for either price source, never an automatic cap, because shop access may be gated.
+
+## Credentials and output
+
+Use LODESTONE_COOKIE from the process environment or hidden terminal input. Never print, log, save,
+commit, or put cookies in command arguments/history. Configured public mode skips credentials; configured full mode requires a nonblank cookie. Explicit
+report --mode/--anon overrides apply only to that invocation. Blank credentials never downgrade full mode.
+An invalid cookie stops authenticated refresh;
+network/pricing/parser failures are diagnosed separately. Debug HTML and local refresh staging are ignored.
+
+## Session records
+
+Use the configured timezone, default UTC. Preserve an explicitly reported session date across midnight.
+Verify actual reset boundaries; a new calendar day does not establish a reset. A duty clear does not prove
+roulette completion, a queue is not a clear, and a full reward book is not a hand-in.
+Keep reusable checklist boxes separate from dated checked outcomes. Use mobile-friendly lists, no tables
+in the saved checklist. Chat tables remain available for specialist comparisons.
