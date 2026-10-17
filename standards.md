@@ -29,6 +29,8 @@ The inventory-cleanup skill owns this procedure and the resulting material-prote
 Persist crafting quest research/keeps in quest_turnins.json and generated protections/reasons/recipe cache
 in quest_mats.json. Reuse saved references; sync reconciles against levels and completed history. Do not
 keep the authoritative material list in chat or prose memory. A level increase alone never completes a quest.
+Recipe caches preserve output batch yields and ingredient quantities per craft. Never treat
+per-craft inputs as per-output quantities; round required crafts up using the verified yield.
 
 ## Workflow boundaries
 
@@ -79,3 +81,16 @@ Verify actual reset boundaries; a new calendar day does not establish a reset. A
 roulette completion, a queue is not a clear, and a full reward book is not a hand-in.
 Keep reusable checklist boxes separate from dated checked outcomes. Use mobile-friendly lists, no tables
 in the saved checklist. Chat tables remain available for specialist comparisons.
+
+## Branches, commits, and versions
+
+Use `<type>/<kebab-case-summary>` for branches and Conventional Commits
+`<type>[optional scope]: <summary>` for commit messages and pull request titles.
+Use `feat` for new functionality and `fix` for corrections; use `docs`, `test`,
+`refactor`, `chore`, or `ci` for changes of those kinds.
+Release versions follow Semantic Versioning: backward-compatible features warrant a minor
+increment, fixes warrant a patch increment, and incompatible public API changes warrant a
+major increment. Mark breaking changes with `!` and a `BREAKING CHANGE:` explanation.
+An internal cache migration that preserves existing workflows is not by itself a public API break.
+Branch creation does not establish a release version; create version tags only for an explicitly
+authorized release against the established version baseline.

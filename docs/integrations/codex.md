@@ -4,8 +4,9 @@ Scionbook does not require Codex. Use the [portable workflow](../assistant-setup
 assistant that meets its capability requirements. This page documents the existing Codex adapter;
 these commands and URL schemes are not instructions for other clients.
 
-Codex-specific files are `.codex/config.toml`, `scripts/scionbook-chat`, and the `draft`, `recap`,
-and `session` actions in `scionbook_handoff.py`. The project config disables automatic memory and
+Codex-specific behavior lives in `.codex/config.toml`, the default Codex mode of
+`scripts/scionbook-chat`, and the `draft` action / Codex CLI mode of `scionbook_handoff.py`.
+The shared CLI helpers also support Claude Code; see [CLAUDE.md](../../CLAUDE.md). The project config disables automatic memory and
 multi-agent tools for new trusted chats; it does not configure another assistant or change an existing chat.
 Use the user's configured model. The interactive launchers require Bash and Codex CLI:
 

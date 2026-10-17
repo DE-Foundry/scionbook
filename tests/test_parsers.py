@@ -459,7 +459,7 @@ def test_recipe_ingredients_filters_padding_and_sentinel():
             {"row_id": 2, "fields": {"Name": "Fire Shard"}},
             {"value": -1},
         ],
-        "AmountIngredient": [2, 0, 1, 0],
+        "AmountResult": 1, "AmountIngredient": [2, 0, 1, 0],
     }
     result = fqm.recipe_ingredients(fields)
     assert result == [("Copper Ore", 2), ("Fire Shard", 1)]
@@ -479,7 +479,7 @@ def test_walk_closure_recurses_into_sub_recipes(monkeypatch):
         "Mythril Plate": {"Ingredient": [
             {"row_id": 1, "fields": {"Name": "Mythril Ingot"}},
             {"row_id": 2, "fields": {"Name": "Ice Shard"}}],
-            "AmountIngredient": [2, 4]},
+            "AmountResult": 1, "AmountIngredient": [2, 4]},
         "Mythril Ingot": None,
         "Ice Shard": None,
     }
@@ -496,9 +496,9 @@ def test_walk_closure_recurses_into_sub_recipes(monkeypatch):
 
 def test_walk_closure_breaks_cycles(monkeypatch):
     recipes = {"A": {"Ingredient": [{"row_id": 1, "fields": {"Name": "B"}}],
-                     "AmountIngredient": [1]},
+                     "AmountResult": 1, "AmountIngredient": [1]},
               "B": {"Ingredient": [{"row_id": 1, "fields": {"Name": "A"}}],
-                    "AmountIngredient": [1]}}
+                    "AmountResult": 1, "AmountIngredient": [1]}}
     monkeypatch.setattr(fqm, "find_recipe",
                         lambda name, session: recipes.get(name))
     node = fqm.walk_closure("A", session=None, cache={})
@@ -515,10 +515,10 @@ def test_walk_closure_caches_repeated_ingredients(monkeypatch):
         calls.append(name)
         if name == "Widget A":
             return {"Ingredient": [{"row_id": 1, "fields": {"Name": "Shard"}}],
-                    "AmountIngredient": [1]}
+                    "AmountResult": 1, "AmountIngredient": [1]}
         if name == "Widget B":
             return {"Ingredient": [{"row_id": 1, "fields": {"Name": "Shard"}}],
-                    "AmountIngredient": [1]}
+                    "AmountResult": 1, "AmountIngredient": [1]}
         return None
 
     monkeypatch.setattr(fqm, "find_recipe", fake_find)
