@@ -62,7 +62,11 @@ def read_terms(path):
 
 def personal_paths(names):
     return sorted(n for n in names if n not in ALLOWED_TEMPLATES
-                  and any(PurePosixPath(n).name.startswith(p) for p in PERSONAL_NAMES))
+                  and (any(PurePosixPath(n).name.startswith(p) for p in PERSONAL_NAMES)
+                       or any(part in {".git", ".venv", "__pycache__", ".pytest_cache",
+                                       "local", "raw", ".cache", "cache"}
+                              or part.startswith((".env", ".scionbook-"))
+                              for part in PurePosixPath(n).parts)))
 
 
 def scan(files, terms):
@@ -129,7 +133,7 @@ def main(argv=None):
     git("init", "-q", "-b", "main", repo=destination)
     git("add", "-A", repo=destination)
     if args.commit:
-        git("commit", "-q", "-m", "Initial public release", repo=destination)
+        git("commit", "-q", "-m", "chore: initial public release", repo=destination)
     print(f"Exported {len(files)} files to {destination} with fresh history "
           f"({len(terms)} identifying terms checked). Review, then add a remote and push.")
 

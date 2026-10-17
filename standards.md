@@ -51,7 +51,7 @@ Specialist skills own detailed cleanup, market, gearing, and hunt procedures. Co
 Hunt plans default to practical travel order, grouping nearby suitable targets and separating skipped or
 conditional marks; verify travel dependencies and state the proposed start when the current location is unknown.
 Personal preferences belong in scionbook.json or dated local memory, not shared skill text.
-Never commit or push on sync unless the user separately established that policy for their private checkout.
+Never commit or push player data, including to private branches. Sync only saves local ignored files.
 
 ## Inventory and market recommendations
 
@@ -94,3 +94,22 @@ major increment. Mark breaking changes with `!` and a `BREAKING CHANGE:` explana
 An internal cache migration that preserves existing workflows is not by itself a public API break.
 Branch creation does not establish a release version; create version tags only for an explicitly
 authorized release against the established version baseline.
+
+
+Releases are reviewed source ZIPs built with `scripts/build_release.py`, with SHA-256 checksums.
+Retain the current version and three previous versions (four total); retain source tags for provenance.
+See docs/releasing.md for the compatibility contract, build procedure, and hosted cleanup.
+No character identity, profile/account link, personal information, or player state may enter tracked
+content, commit messages, author metadata, branches, tags, or release assets. Private project branches
+and forks are not exceptions. Use a nonpersonal project identity for published Git authorship.
+Local runtime state remains ignored; personal backups must be separate from the project repository.
+
+
+## Installation and updates
+
+Support release ZIPs and personal forks for players. Contributors use local clones and branches named
+`<type>/<kebab-case-summary>`, with Conventional Commits and pull requests. External contributors may
+clone a fork. Document both user methods in docs/installation.md; do not require Git for ZIP usage.
+Use one local directory per character, never character branches. Personal state remains ignored in all
+methods, including private forks. Application updates preserve local state; any saved-format changes
+need documented migration and rollback guidance. Updating source never implies setup or a refresh.

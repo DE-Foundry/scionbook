@@ -77,8 +77,8 @@ coverage remains unknown. Do not assume a default tier; keep specialist plans in
 Bump memory version only when its contents change. Update personal preferences in scionbook.json when
 explicitly supplied, not shared instructions/standards. Re-read the resulting sources and report the real
 source time, meaningful changes, and remaining gaps. Do not dump a cleanup/market plan unless requested.
-Local refresh does not authorize commit/push or force-adding ignored player data. Follow a separately
-established private-backup policy only if present.
+Local refresh does not authorize commit/push. Never force-add player data or use this repository,
+its branches, or project forks as a personal-data backup, even when private.
 
 ## Offer a fresh session
 
