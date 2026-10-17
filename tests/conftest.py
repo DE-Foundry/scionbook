@@ -9,3 +9,4 @@ def block_live_http(monkeypatch):
         pytest.fail("Unexpected live HTTP request; supply a synthetic response in this test")
     monkeypatch.setattr(requests.adapters.HTTPAdapter, "send", blocked)
     monkeypatch.delenv("LODESTONE_COOKIE", raising=False)
+    monkeypatch.delenv("SCIONBOOK_CLIENT", raising=False)

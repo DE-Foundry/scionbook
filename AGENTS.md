@@ -71,5 +71,6 @@ Specialist analysis works in either role without changing that role's write perm
 Use read-only file access for Session Planner and repository read/write access for Maintainer, enforced
 by the chosen client's permission controls. Disable cross-chat memory/retrieval where supported; never
 use it for these workflows. Instructions do not change a chat's permissions or context. Use the user's
-chosen assistant and model. The optional Codex config and `scripts/scionbook-chat` launcher apply only
-to Codex; see docs/integrations/codex.md. Manual prompts and handoffs work without those adapters.
+chosen assistant and model. Optional Codex and Claude Code configurations and the `scripts/scionbook-chat` launcher apply
+only to their selected client; see docs/integrations/codex.md and CLAUDE.md.
+Manual prompts and handoffs work without those adapters.

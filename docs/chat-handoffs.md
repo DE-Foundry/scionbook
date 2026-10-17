@@ -55,7 +55,9 @@ handoff is sufficient. No or silence causes no action. Never retry a failed save
 without resolving the failure. Do not sync, commit, or push as part of a recap handoff.
 
 The [Codex integration](integrations/codex.md) supplies optional draft links and CLI automation. Do not
-emit `codex://` links or run its launchers in another client. Other adapters must document their own
+emit `codex://` links in another client. The [Claude Code adapter](../CLAUDE.md) uses
+`SCIONBOOK_CLIENT=claude` for the launcher or `--client claude` for recap/session handoffs.
+It has no desktop draft link. Other adapters must document their own
 capabilities; never invent a new-chat API or treat a prompt as enforcement of file permissions.
 If automation is unsupported or blocked by runtime permissions, use the manual prompts above without
 requesting a Session Planner write escalation. A hidden tool terminal is not a user-visible chat.
@@ -72,3 +74,18 @@ python3 scionbook_handoff.py prompt --role apply
 ```
 
 For apply, paste the recap after the printed label. Keep recap text out of URLs and command arguments.
+
+## Claude Code CLI handoff
+
+In a user-accessible terminal with Bash and Claude Code installed:
+
+```bash
+python3 scionbook_handoff.py recap --client claude --confirmed
+python3 scionbook_handoff.py session --client claude --confirmed
+```
+
+Pass only the approved recap through stdin. The apply step uses a fresh, nonpersistent process,
+file read/edit tools only, and a structured success receipt before the separate Maintainer launch.
+The helper checks for an interactive terminal before any save. `--confirmed` records approval
+already received, not permission to skip asking. Never run this as an unattended nested interactive
+chat in an app tool; use manual handoff when a user-accessible terminal is unavailable.

@@ -137,7 +137,7 @@ def test_report_reconciles_and_stages_protection_before_building_cleanup(run_rep
                     'verified_at_utc': '2026-01-01T00:00:00Z',
                     'turnins': [{'name': 'Item 1', 'quantity': 1, 'hq': False}]}]})
     monkeypatch.setattr(mats, 'find_recipe', lambda name, session:
-        {'Ingredient': [], 'AmountIngredient': []} if name == 'Item 1' else None)
+        {'Ingredient': [], 'AmountResult': 1, 'AmountIngredient': []} if name == 'Item 1' else None)
     args = ['--quest-turnins', str(source), '--quest-mats', str(cache), '--quest-mats-out', str(staged)]
     _, first = run_report([1], protection_args=args)
     saved = cp.read_json(staged)

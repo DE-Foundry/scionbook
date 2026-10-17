@@ -109,10 +109,10 @@ def test_success_applies_then_starts_maintainer_without_payload(monkeypatch, sta
     mock_terminal(monkeypatch)
     events = []
     monkeypatch.setattr(sys, "stdin", io.StringIO("Only approved recap"))
-    def apply(text):
+    def apply(text, **_):
         events.append(("apply", text))
         return {"status": status, "summary": "Done"}
-    def start(role, terminal):
+    def start(role, terminal, **_):
         events.append(("start", role))
         return 0
     monkeypatch.setattr(handoff, "apply_recap", apply)
@@ -125,7 +125,7 @@ def test_apply_failure_does_not_launch_or_retry(monkeypatch):
     mock_terminal(monkeypatch)
     monkeypatch.setattr(sys, "stdin", io.StringIO("Approved recap"))
     calls = []
-    def fail(text):
+    def fail(text, **_):
         calls.append(text)
         raise RuntimeError("Needs clarification")
     monkeypatch.setattr(handoff, "apply_recap", fail)
@@ -140,14 +140,14 @@ def test_session_transition_only_starts_session(monkeypatch):
     mock_terminal(monkeypatch)
     monkeypatch.setattr(handoff, "apply_recap", lambda *a: pytest.fail("applied recap"))
     calls = []
-    monkeypatch.setattr(handoff, "start_chat", lambda role, terminal: calls.append(role) or 0)
+    monkeypatch.setattr(handoff, "start_chat", lambda role, terminal, **_: calls.append(role) or 0)
     handoff.main(["session", "--confirmed"])
     assert calls == ["session"]
 
 
 def test_launch_failure_is_reported(monkeypatch):
     mock_terminal(monkeypatch)
-    monkeypatch.setattr(handoff, "start_chat", lambda *a: 3)
+    monkeypatch.setattr(handoff, "start_chat", lambda *a, **k: 3)
     with pytest.raises(SystemExit) as error:
         handoff.main(["session", "--confirmed"])
     assert error.value.code == 3
@@ -172,6 +172,89 @@ def test_actual_launcher_uses_new_context_and_role_permissions(tmp_path, role, s
     assert not any(value in args for value in ("resume", "fork", "--last"))
     assert "memories.use_memories=false" in args
     assert "agents.enabled=false" in args
+
+
+def fake_claude(tmp_path):
+    executable = tmp_path / "claude"
+    executable.write_text("#!/bin/sh\nprintf '%s\\n' \"$PWD\" \"$CLAUDE_CODE_DISABLE_AUTO_MEMORY\" \"$@\"\n")
+    executable.chmod(0o755)
+    return {**os.environ, "PATH": str(tmp_path) + os.pathsep + os.environ["PATH"],
+            "SCIONBOOK_CLIENT": "claude"}
+
+
+def test_claude_session_launcher_is_read_only(tmp_path):
+    result = subprocess.run(["bash", str(handoff.REPO / "scripts" / "scionbook-chat"), "session"],
+                            env=fake_claude(tmp_path), text=True, capture_output=True, check=True)
+    cwd, memory, *args = result.stdout.splitlines()
+    assert cwd == str(handoff.REPO) and memory == "1"
+    assert args[args.index("--permission-mode") + 1] == "dontAsk"
+    denied = args[args.index("--disallowedTools") + 1:args.index("--")]
+    assert {"Bash", "Edit", "Write", "NotebookEdit", "Agent"} <= set(denied)
+    allowed = args[args.index("--allowedTools") + 1:args.index("--disallowedTools")]
+    assert not {"Bash", "Edit", "Write"} & set(allowed)
+    assert "start-session" in args[-1] and "Session Planner" in args[-1]
+    assert not any(value in args for value in ("--resume", "--continue", "-c", "-r"))
+
+
+def test_claude_maintainer_launcher_keeps_write_prompts(tmp_path):
+    result = subprocess.run(["bash", str(handoff.REPO / "scripts" / "scionbook-chat"), "maintainer"],
+                            env=fake_claude(tmp_path), text=True, capture_output=True, check=True)
+    _, memory, *args = result.stdout.splitlines()
+    assert memory == "1"
+    assert "--permission-mode" not in args
+    assert "--dangerously-skip-permissions" not in args
+    assert args[args.index("--disallowedTools") + 1] == "Agent"
+    assert "start-maintenance" in args[-1]
+
+
+def test_unknown_client_is_rejected(tmp_path):
+    environment = {**os.environ, "SCIONBOOK_CLIENT": "other"}
+    result = subprocess.run(["bash", str(handoff.REPO / "scripts" / "scionbook-chat"), "session"],
+                            env=environment, text=True, capture_output=True)
+    assert result.returncode == 2 and "Unsupported" in result.stderr
+    with pytest.raises(ValueError, match="Unsupported"):
+        handoff.apply_recap("Approved recap", tmp_path, client="other")
+
+
+def test_claude_apply_is_ephemeral_file_only_and_checks_structured_receipt(tmp_path, monkeypatch):
+    recap = "What's worth saving: $(touch nope)"
+    receipt = {"status": "applied", "summary": "Saved."}
+    calls = []
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+        return SimpleNamespace(returncode=0, stdout=json.dumps({"structured_output": receipt}))
+    monkeypatch.setattr(handoff.subprocess, "run", run)
+    monkeypatch.setenv("LODESTONE_COOKIE", "test-only-value")
+    monkeypatch.setenv("SCIONBOOK_CLIENT", "claude")
+    assert handoff.apply_recap(recap, tmp_path) == receipt
+    command, kwargs = calls[0]
+    assert command[0] == "claude" and "-p" in command and "--no-session-persistence" in command
+    assert command[command.index("--permission-mode") + 1] == "dontAsk"
+    denied = command[command.index("--disallowedTools") + 1:]
+    assert {"Bash", "Agent"} <= set(denied)
+    assert json.loads(command[command.index("--json-schema") + 1]) == handoff.RESULT_SCHEMA
+    assert recap not in " ".join(command)
+    assert json.dumps(recap, ensure_ascii=False) in kwargs["input"]
+    assert "$apply-recap" not in kwargs["input"] and "apply-recap skill" in kwargs["input"]
+    assert kwargs["cwd"] == str(tmp_path)
+    assert "LODESTONE_COOKIE" not in kwargs["env"]
+    assert kwargs["env"]["CLAUDE_CODE_DISABLE_AUTO_MEMORY"] == "1"
+
+
+@pytest.mark.parametrize("stdout", ["not JSON", "{}", json.dumps({"structured_output": None})])
+def test_claude_apply_without_valid_receipt_is_not_success(tmp_path, monkeypatch, stdout):
+    monkeypatch.setattr(handoff.subprocess, "run",
+                        lambda *a, **k: SimpleNamespace(returncode=0, stdout=stdout))
+    with pytest.raises(RuntimeError):
+        handoff.apply_recap("Approved recap", tmp_path, client="claude")
+
+
+def test_start_chat_passes_client_to_launcher(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(handoff.subprocess, "run",
+                        lambda command, **k: seen.update(k) or SimpleNamespace(returncode=0))
+    handoff.start_chat("session", None, client="claude")
+    assert seen["env"]["SCIONBOOK_CLIENT"] == "claude"
 
 
 @pytest.mark.parametrize('role,skill', [('session', 'start-session'), ('maintainer', 'start-maintenance'), ('apply', 'apply-recap')])

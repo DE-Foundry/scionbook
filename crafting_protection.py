@@ -63,6 +63,8 @@ def validate_plan(plan):
         for key in ("qid", "name", "job"):
             if not text(quest.get(key)):
                 raise ValueError(f"Quest requires {key}.")
+        if quest["qid"] == "quest":
+            raise ValueError("Crafting references need a real quest ID, not the history placeholder.")
         if quest["qid"] in keys:
             raise ValueError("Duplicate quest ID in crafting plan.")
         keys.add(quest["qid"])
@@ -107,9 +109,22 @@ def validated_snapshot(plan, status, previous):
         raise ValueError("Complete authenticated quest history is required; prior protection preserved.")
     if any(not isinstance(q, dict) or not text(q.get("qid")) for q in entries):
         raise ValueError("Completed quest entries must have Lodestone quest IDs.")
-    completed = {q["qid"] for q in entries}
-    if len(completed) != total:
-        raise ValueError("Duplicate completed quests cannot establish complete history.")
+    completed, identities = set(), set()
+    for quest in entries:
+        qid = quest["qid"]
+        if qid == "quest":
+            # Legacy list links can end at /quest/ without an individual ID.
+            # Count distinct category/name records, but never use the placeholder
+            # as evidence that a researched crafting quest has been completed.
+            if not text(quest.get("category")) or not text(quest.get("name")):
+                raise ValueError("Placeholder quest IDs require a category and name.")
+            identity = ("fallback", quest["category"].strip(), quest["name"].strip())
+        else:
+            identity = ("qid", qid)
+            completed.add(qid)
+        if identity in identities:
+            raise ValueError("Duplicate completed quests cannot establish complete history.")
+        identities.add(identity)
     levels = (status.get("jobs") or {}).get("crafters")
     if (not isinstance(levels, dict) or status.get("jobs_parsed") == 0
             or any(not positive(l) for l in levels.values())):
@@ -151,7 +166,7 @@ def reconcile(plan, status, previous=None, refresh_recipes=False):
         validate_tree(tree)
         if tree["name"] != name:
             raise ValueError("Recipe cache key/name mismatch.")
-    cached_names = set(cache)
+    original_cache = copy.deepcopy(cache)
     selected, records, gaps = {}, [], []
     for job, level in levels.items():
         if plan["coverage"].get(job, 0) < level:
@@ -169,8 +184,9 @@ def reconcile(plan, status, previous=None, refresh_recipes=False):
             names.extend(i["name"] for i in quest["turnins"] if i["name"] not in names)
     closure = build_closure(selected, cache=cache)
     checked_at = {} if refresh_recipes else dict((previous or {}).get("recipe_checked_at_utc", {}))
-    for name in set(cache) - cached_names:
-        checked_at[name] = closure["generated_at_utc"]
+    for name, tree in cache.items():
+        if tree != original_cache.get(name):
+            checked_at[name] = closure["generated_at_utc"]
     reasons = {}
     for quest in records:
         if quest["state"] != "unfinished" or quest["kind"] != "ordinary":

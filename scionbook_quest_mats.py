@@ -67,11 +67,25 @@ def recipe_ingredients(recipe_fields):
     return out
 
 
+def cache_has_batch_yields(node):
+    """Legacy trees must be fetched again, including nested recipe copies."""
+    if node.get("is_craftable"):
+        amount = node.get("amount_result")
+        if type(amount) is not int or amount < 1:
+            return False
+        for child in node.get("ingredients", []):
+            qty = child.get("qty_per_craft")
+            if type(qty) is not int or qty < 1 or "qty_per_unit" in child:
+                return False
+    return all(cache_has_batch_yields(child) for child in node.get("ingredients", []))
+
+
 def walk_closure(item_name, session, cache, path=()):
     """Recursively expand an item into its raw-material closure.
 
     Returns a dict: {"name": ..., "is_craftable": bool,
-                     "ingredients": [subtree, ...]}
+                     "amount_result": output per craft (craftable nodes only),
+                     "ingredients": [subtree with qty_per_craft, ...]}
     A leaf (no recipe found - a gatherable, a shard/crystal, a monster drop,
     or a vendor purchase) has an empty ingredients list.
 
@@ -80,7 +94,7 @@ def walk_closure(item_name, session, cache, path=()):
     Armorer/Carpenter/Leatherworker recipe). `path` guards against a cyclic
     recipe graph, which shouldn't exist in FFXIV's data but costs nothing to
     guard against."""
-    if item_name in cache:
+    if item_name in cache and cache_has_batch_yields(cache[item_name]):
         return cache[item_name]
     if item_name in path:
         return {"name": item_name, "is_craftable": False, "ingredients": [],
@@ -90,12 +104,17 @@ def walk_closure(item_name, session, cache, path=()):
     if not recipe:
         node = {"name": item_name, "is_craftable": False, "ingredients": []}
     else:
+        amount_result = recipe.get("AmountResult")
+        if type(amount_result) is not int or amount_result < 1:
+            raise ValueError(f"Invalid or missing recipe yield for {item_name!r}.")
         children = []
         for ing_name, qty in recipe_ingredients(recipe):
             child = walk_closure(ing_name, session, cache, path + (item_name,))
-            children.append({**child, "qty_per_unit": qty})
+            if type(qty) is not int or qty < 1:
+                raise ValueError(f"Invalid ingredient quantity for {item_name!r}.")
+            children.append({**child, "qty_per_craft": qty})
         node = {"name": item_name, "is_craftable": True,
-                "ingredients": children}
+                "amount_result": amount_result, "ingredients": children}
     cache[item_name] = node
     return node
 
@@ -156,6 +175,10 @@ def build_closure(quest_turnins, cache=None):
     session = requests.Session()
     session.headers.update(HTTP_HEADERS)
     cache = {} if cache is None else cache
+    # Repair every retained legacy entry, including currently inactive recipes.
+    for name in list(cache):
+        if not cache_has_batch_yields(cache[name]):
+            walk_closure(name, session, cache)
     turnins = {}
     all_leaves = set()
     for job, levels in quest_turnins.items():

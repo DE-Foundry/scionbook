@@ -34,6 +34,8 @@ at your own risk.
 Requirements: Python 3.10+ with IANA timezone data, internet access, and an assistant able to read the local
 workflow instructions and saved files. Workflows live in `.agents/skills/` and can be read directly;
 native skill discovery is optional.
+Codex discovers `.agents/skills/`; Claude Code uses the `.claude/skills` link and `CLAUDE.md`,
+with `/setup` instead of `$setup`. Other clients can read the named file directly.
 The requirements install `tzdata` on Windows for IANA timezone support. Open the repository folder in your
 assistant and run the following from that folder. Skills are instructions for the assistant, not shell commands.
 
@@ -56,6 +58,7 @@ python -m pip install -r requirements.txt
 Use the virtual environment's Python for every helper below. If activation is unavailable, invoke
 `.venv/bin/python` directly, or `.\.venv\Scripts\python.exe` on Windows. In an activated Windows environment,
 use `python` in place of `python3`. Optional client launchers have their own requirements; the portable workflow needs none of them.
+The optional CLI launchers require Bash and the selected Codex or Claude Code CLI.
 
 Open a fresh **Repository Maintainer** chat with repository read/write access and send:
 
@@ -101,6 +104,16 @@ apply-recap, then use a fresh startup prompt for the next role. A prompt is not 
 See [manual handoffs](docs/chat-handoffs.md) and [assistant setup](docs/assistant-setup.md), including
 what to do when the assistant only supports uploaded files. Optional [Codex launchers and draft links](docs/integrations/codex.md)
 are separate conveniences. They are not required by the Python tools or shared workflows.
+
+Optional CLI examples (run in a user-accessible terminal):
+
+```bash
+SCIONBOOK_CLIENT=claude bash scripts/scionbook-chat session
+python3 scionbook_handoff.py session --client claude --confirmed
+```
+
+Use `--confirmed` only after explicit approval of that transition. See [Claude Code](CLAUDE.md)
+and [handoffs](docs/chat-handoffs.md) for permission and save-verification boundaries.
 
 ## Everyday workflow
 
@@ -180,9 +193,10 @@ Shared instructions, skills, code, neutral templates, and player-independent unl
 There is no asks.md/decisions.md workflow. Sync saves locally by default; no automatic commit or push.
 An explicitly configured private backup is optional. Do not force-add local data to a public repository.
 
-For a clean, player-free repository copy, copy shared source files including `.agents`, `.codex`, and `.gitignore`;
-exclude `.git`, `.venv`, caches, credentials, debug dumps, and all local player files above. Do not use an
-archive of an older commit to export uncommitted cleanup work. The source repository's Git history is unchanged.
+For a clean, player-free repository, use `python3 scripts/export_release.py DESTINATION`. It exports only the
+committed tree at HEAD into a new repository with no prior history, refuses tracked player-state files, and
+scans for identifying terms taken from your local configuration and snapshot plus any denylist you supply.
+Pushing or copying `.git` carries the full history. See [releasing](docs/releasing.md).
 
 ## Move to a new directory without another sync
 
@@ -208,7 +222,7 @@ or cleaned checkout.
    from the same checkout so the snapshot, history, cleanup report, and crafting protection match. Use a
    fresh destination without another character's state; do not overwrite newer reports with an older copy.
 3. Recreate the Python environment using [Get started](#get-started). Keep the shared source files,
-   including `.agents/`, `.codex/`, `.gitignore`, `SCIONBOOK_INSTRUCTIONS.md`, and `standards.md`.
+   including `.agents/`, `.claude/`, `.codex/`, `CLAUDE.md`, `.gitignore`, `SCIONBOOK_INSTRUCTIONS.md`, and `standards.md`.
    Do not copy `.venv`, `.git`, credentials, raw dumps, or temporary handoff/staging files. Custom saved
    outputs under `local/` are optional; carry over only those you want to retain.
 4. Open the new directory in a fresh read-only chat and send `$start-session`. It loads the copied state;
@@ -321,7 +335,7 @@ completed quests; migrate them using verified quest references, never invented I
 - **Setup has configuration but no validated snapshot:** resume `$sync` in Maintainer after resolving credentials or fetch errors; do not reinitialize progress.
 - **Quest history is incomplete:** increase the page limit and validate the known total. Preserve the last complete canonical files.
 - **Crafting references have gaps:** research only missing tiers/items, preserve explicit keeps, and disclose uncovered special quests. Missing coverage is not permission to discard materials.
-- **An supported client draft opens without recap text:** paste the displayed recap after “Recap to apply:” before Send. The link intentionally carries no gameplay data.
+- **A supported client draft opens without recap text:** paste the displayed recap after “Recap to apply:” before Send. The link intentionally carries no gameplay data.
 - **A save or sync fails:** report any partial work, preserve previous validated sources, and resolve the failure before a success handoff. Do not treat a prepared link as a completed save.
 
 ## Development
@@ -340,7 +354,10 @@ name database, and XIVAPI for optional recipe/vendor data. No credentials are ne
 Python 3.10 and 3.14 on Ubuntu, plus Python 3.14 on macOS. The workflow installs `requirements-dev.txt`
 and runs `python -m pytest tests/ -q` with read-only repository permissions and no account secrets.
 These are offline fixture tests, not live Lodestone compatibility checks. Windows CI is not yet included;
-the optional Bash/Codex launchers are tested on Linux and macOS.
+the optional Bash launchers (Codex and Claude Code, using stub executables) are tested on Linux and macOS.
+
+Review public releases using [releasing](docs/releasing.md). A fresh-history export is optional for
+checkouts whose history should not be published.
 
 ## Contributing and public releases
 
