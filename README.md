@@ -29,12 +29,19 @@ Scionbook is not affiliated with or endorsed by Square Enix. Users must provide 
 authenticated Lodestone session to access private character data. Scraping and use of this tool are
 at your own risk.
 
+## Choose an installation method
+
+Use a **release ZIP** if you want to run Scionbook with an agent without managing Git, or a **personal
+fork** if you want your own source repository and upstream updates. Both keep character data local and
+untracked. Contributors use a separate clone and policy-named development branches.
+See [installation and updates](docs/installation.md) for steps, agent prompts, and preserving saved state.
+
 ## Get started
 
 Requirements: Python 3.10+ with IANA timezone data, internet access, and an assistant able to read the local
 workflow instructions and saved files. Workflows live in `.agents/skills/` and can be read directly;
 native skill discovery is optional.
-Codex discovers `.agents/skills/`; Claude Code uses the `.claude/skills` link and `CLAUDE.md`,
+Codex discovers `.agents/skills/`; Claude Code uses `.claude/skills` (a link in Git checkouts, ordinary files in release ZIPs) and `CLAUDE.md`,
 with `/setup` instead of `$setup`. Other clients can read the named file directly.
 The requirements install `tzdata` on Windows for IANA timezone support. Open the repository folder in your
 assistant and run the following from that folder. Skills are instructions for the assistant, not shell commands.
@@ -191,7 +198,8 @@ by its contents; an arbitrary filename elsewhere needs its own ignore rule.
 
 Shared instructions, skills, code, neutral templates, and player-independent unlocks.json are tracked.
 There is no asks.md/decisions.md workflow. Sync saves locally by default; no automatic commit or push.
-An explicitly configured private backup is optional. Do not force-add local data to a public repository.
+Never commit character identities, profile links, account data, personal information, preferences, or
+player reports, including on private branches. Backups must remain outside this repository and its history.
 
 For a clean, player-free repository, use `python3 scripts/export_release.py DESTINATION`. It exports only the
 committed tree at HEAD into a new repository with no prior history, refuses tracked player-state files, and
@@ -356,7 +364,8 @@ and runs `python -m pytest tests/ -q` with read-only repository permissions and 
 These are offline fixture tests, not live Lodestone compatibility checks. Windows CI is not yet included;
 the optional Bash launchers (Codex and Claude Code, using stub executables) are tested on Linux and macOS.
 
-Review public releases using [releasing](docs/releasing.md). A fresh-history export is optional for
+Releases are versioned ZIP archives with checksums; keep the current version plus three previous
+versions. Build and review them using [releasing](docs/releasing.md). A fresh-history export is optional for
 checkouts whose history should not be published.
 
 ## Contributing and public releases

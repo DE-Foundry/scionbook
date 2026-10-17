@@ -58,8 +58,10 @@ In the Codex desktop app, an optional documented draft link can prefill start-se
 read-only and press Send. Offer full launch only when supported. Follow docs/chat-handoffs.md; use explicit
 Yes for transitions and never claim a draft started the skill or the current context was cleared.
 
-There is no standing commit/push authorization. Personal data stays local by default. Only configure
-private Git backup when explicitly requested; never force-add ignored data during ordinary sync.
+There is no standing commit/push authorization. Character identities, profile links, account data,
+preferences, gameplay reports, and personal information must never enter tracked files, branches,
+tags, release assets, or repository history. This includes private branches and forks used for project
+work. Never force-add player data or configure Git backups in this repository. Local player files stay ignored.
 Report local saves, refreshes, commits, and verified pushes separately.
 
 ## Skills and runtime

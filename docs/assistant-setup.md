@@ -25,7 +25,8 @@ current facts remain unverified; do not substitute remembered prices or patch de
 
 ## First use
 
-1. Install Python dependencies using the [README](../README.md#get-started).
+1. Choose a [release ZIP or personal fork](installation.md), then install Python dependencies using
+   the [README](../README.md#get-started).
 2. Open a fresh Maintainer chat with this repository available. Paste:
 
    ```text
