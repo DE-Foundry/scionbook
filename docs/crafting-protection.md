@@ -54,6 +54,10 @@ Version 2 uses the following shape. These are synthetic examples, not real quest
 Use the **Lodestone quest ID** (`quests.recent[].qid`), not an XIVAPI numeric row ID. Keep source URLs,
 verification dates, quantities/HQ requirements and prerequisite notes in each quest record. `coverage`
 means every relevant quest through that level has been researched, including quests with no normal craft.
+Legacy history records whose list link supplied only `qid: "quest"` are counted by their
+category/name pair when both are present and unique. They never establish completion of a researched
+quest; do not use that placeholder in a plan. Duplicate real IDs or duplicate fallback records still
+reject the snapshot.
 Only raise it after checking the chain. Cache future tiers too when researched; retain completed references.
 Kinds are `ordinary` (recipe closure), `no_turnin` (empty turnins), and `special` (stored but reported as an
 unresolved material-coverage gap). A special quest is never silently treated as a normal recipe.
@@ -104,3 +108,16 @@ needs extending; save the references once. Recheck changed references deliberate
 Legacy job -> level -> item-name plans remain supported by the generator without `--status`. They do not
 identify completed quests; migrate to version 2 by looking up the missing IDs and references while retaining
 explicit keeps. Never infer quest completion from level alone or prune from public/incomplete quest history.
+
+### Recipe batch quantities
+
+Craftable cache nodes store positive integer `amount_result` (items produced per craft).
+Each ingredient edge stores `qty_per_craft`, the quantity consumed by one craft of its parent.
+For a required output quantity, round the number of crafts up before expanding ingredients:
+`crafts = (required + amount_result - 1) // amount_result`. Combine shared intermediate
+requirements before rounding to avoid redundant batches. Protection still operates by item type;
+these fields do not establish remaining inventory or HQ availability.
+
+Legacy trees with missing yields or `qty_per_unit` edges are fetched again automatically,
+including retained inactive recipes and nested copies. Repaired entries receive new lookup dates.
+Missing or invalid API yields fail the rebuild rather than assuming a yield of one.

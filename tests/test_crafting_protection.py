@@ -44,7 +44,7 @@ def recipes(monkeypatch):
             return None
         return {"Ingredient": [{"row_id": 1, "fields": {"Name": "Shared Ore"}},
                                {"row_id": 2, "fields": {"Name": name + " Material"}}],
-                "AmountIngredient": [1, 2]}
+                "AmountResult": 1, "AmountIngredient": [1, 2]}
     monkeypatch.setattr(mats, "find_recipe", find)
     monkeypatch.setattr(mats.time, "sleep", lambda _: None)
     return calls
@@ -150,5 +150,98 @@ def test_network_failure_does_not_replace_prior_file(recipes, tmp_path, monkeypa
         raise requests.Timeout("offline")
     monkeypatch.setattr(mats, "find_recipe", fail)
     monkeypatch.setattr(sys, "argv", ["scionbook_quest_mats.py", "--turnins", str(source), "--status", str(state), "--out", str(output)])
+    assert mats.main() == 1
+    assert output.read_bytes() == before
+
+
+def test_distinct_legacy_placeholder_quests_preserve_crafting_evidence(recipes):
+    state = snapshot(10, ("a",))
+    state["quests"]["recent"].extend([
+        {"qid": "quest", "category": "Seasonal Quests", "name": "Festival One"},
+        {"qid": "quest", "category": "Seasonal Quests", "name": "Festival Two"},
+    ])
+    state["quests"]["total_completed"] = 3
+    current = cp.reconcile(plan(), state)
+    assert current["quests"][0]["state"] == "completed"
+    assert current["quests"][1]["state"] == "unfinished"
+    assert "Old Craft" not in current["protected_materials"]
+    assert "New Craft" in current["protected_materials"]
+
+
+@pytest.mark.parametrize("entries", [
+    [{"qid": "quest", "category": "Seasonal", "name": "Same"}] * 2,
+    [{"qid": "quest", "name": "Missing category"}],
+    [{"qid": "quest", "category": "Seasonal", "name": " "}],
+])
+def test_ambiguous_legacy_placeholder_history_is_rejected(entries):
+    state = snapshot()
+    state["quests"] = {"recent": entries, "total_completed": len(entries)}
+    with pytest.raises(ValueError):
+        cp.validated_snapshot(plan(), state, None)
+
+
+def test_placeholder_is_never_a_researched_crafting_quest_id():
+    source = plan()
+    source["quests"][0]["qid"] = "quest"
+    with pytest.raises(ValueError, match="real quest ID"):
+        cp.validate_plan(source)
+
+
+def test_batch_yields_survive_nested_cache_roundtrip(monkeypatch):
+    def find(name, session):
+        if name == "Old Craft":
+            return {"AmountResult": 1, "AmountIngredient": [4],
+                    "Ingredient": [{"row_id": 1, "fields": {"Name": "Batch Material"}}]}
+        if name == "Batch Material":
+            return {"AmountResult": 3, "AmountIngredient": [2],
+                    "Ingredient": [{"row_id": 2, "fields": {"Name": "Raw Material"}}]}
+        return None
+    monkeypatch.setattr(mats, "find_recipe", find)
+    monkeypatch.setattr(mats.time, "sleep", lambda _: None)
+    source = plan()
+    source["quests"] = source["quests"][:1]
+    current = cp.reconcile(source, snapshot())
+    tree = current["recipe_cache"]["Old Craft"]
+    batch = tree["ingredients"][0]
+    assert batch["qty_per_craft"] == 4
+    assert batch["amount_result"] == 3
+    assert batch["ingredients"][0]["qty_per_craft"] == 2
+    # Four required intermediate items need two batches, hence four raw items.
+    batches = (batch["qty_per_craft"] + batch["amount_result"] - 1) // batch["amount_result"]
+    assert batches * batch["ingredients"][0]["qty_per_craft"] == 4
+    previous = json.loads(json.dumps(current))
+    monkeypatch.setattr(mats, "find_recipe", lambda *a: pytest.fail("cache not reused"))
+    assert cp.reconcile(source, snapshot(), previous)["recipe_cache"] == previous["recipe_cache"]
+
+
+def test_legacy_nested_and_inactive_cache_repaired(recipes):
+    previous = cp.reconcile(plan(), snapshot())
+    def downgrade(node):
+        node.pop("amount_result", None)
+        for child in node["ingredients"]:
+            child["qty_per_unit"] = child.pop("qty_per_craft")
+            downgrade(child)
+    for node in previous["recipe_cache"].values():
+        downgrade(node)
+    before = copy.deepcopy(previous)
+    current = cp.reconcile(plan(), snapshot(20, ("a", "b", "c")), previous)
+    assert current["protected_materials"] == []
+    assert "Old Craft" in recipes
+    assert all(mats.cache_has_batch_yields(n) for n in current["recipe_cache"].values())
+    assert current["recipe_checked_at_utc"]["Old Craft"] == current["generated_at_utc"]
+    assert previous == before
+
+
+@pytest.mark.parametrize("amount", [None, 0, -1, True, "3"])
+def test_invalid_recipe_yield_fails_without_replacing_output(monkeypatch, tmp_path, amount):
+    source, state, output = (tmp_path / n for n in ("plan.json", "status.json", "mats.json"))
+    cp.write_json(source, plan())
+    cp.write_json(state, snapshot())
+    cp.write_json(output, {"recipe_cache": {}})
+    before = output.read_bytes()
+    monkeypatch.setattr(mats, "find_recipe", lambda *a: {"AmountResult": amount})
+    monkeypatch.setattr(mats.time, "sleep", lambda _: None)
+    monkeypatch.setattr(sys, "argv", ["scionbook_quest_mats.py", "--turnins", str(source),
+                                   "--status", str(state), "--out", str(output)])
     assert mats.main() == 1
     assert output.read_bytes() == before

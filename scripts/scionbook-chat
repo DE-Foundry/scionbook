@@ -1,25 +1,50 @@
 #!/usr/bin/env bash
 # Start a fresh, independent role chat; no inherited transcript or global memory.
+# SCIONBOOK_CLIENT selects the agent CLI: codex (default) or claude.
 set -euo pipefail
 scionbook_repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+scionbook_client="${SCIONBOOK_CLIENT:-codex}"
 if [[ $# -ne 1 ]]; then
-  echo "Usage: $0 session|maintainer" >&2
+  echo "Usage: [SCIONBOOK_CLIENT=codex|claude] $0 session|maintainer" >&2
   exit 2
 fi
 case "$1" in
   session)
     scionbook_sandbox=read-only
     scionbook_approval=never
-    scionbook_prompt='Use $start-session from .agents/skills/start-session/SKILL.md. You are the Session Planner. Keep all new gameplay progress in this conversation and never write files or request escalation.'
+    scionbook_skill=start-session
+    scionbook_role='You are the Session Planner. Keep all new gameplay progress in this conversation and never write files or request escalation.'
     ;;
   maintainer)
     scionbook_sandbox=workspace-write
     scionbook_approval=on-request
-    scionbook_prompt='Use $start-maintenance from .agents/skills/start-maintenance/SKILL.md. You are the Repository Maintainer. Use only this chat and repository files; do not retrieve or contact gameplay chats.'
+    scionbook_skill=start-maintenance
+    scionbook_role='You are the Repository Maintainer. Use only this chat and repository files; do not retrieve or contact gameplay chats.'
     ;;
   *)
-    echo "Usage: $0 session|maintainer" >&2
+    echo "Usage: [SCIONBOOK_CLIENT=codex|claude] $0 session|maintainer" >&2
     exit 2
     ;;
 esac
-exec codex --cd "$scionbook_repo_root"   --sandbox "$scionbook_sandbox" --ask-for-approval "$scionbook_approval"   --config agents.enabled=false   --config memories.generate_memories=false --config memories.use_memories=false   --search "$scionbook_prompt"
+scionbook_file=".agents/skills/$scionbook_skill/SKILL.md"
+case "$scionbook_client" in
+  codex)
+    exec codex --cd "$scionbook_repo_root"   --sandbox "$scionbook_sandbox" --ask-for-approval "$scionbook_approval"   --config agents.enabled=false   --config memories.generate_memories=false --config memories.use_memories=false   --search "Use \$$scionbook_skill from $scionbook_file. $scionbook_role"
+    ;;
+  claude)
+    cd "$scionbook_repo_root"
+    export CLAUDE_CODE_DISABLE_AUTO_MEMORY=1
+    scionbook_prompt="Follow the $scionbook_skill skill in $scionbook_file. $scionbook_role"
+    if [[ "$1" == session ]]; then
+      # Read-only: only file reads are allowed; everything that would prompt is denied.
+      exec claude --permission-mode dontAsk --allowedTools Read Grep Glob WebSearch WebFetch \
+        --disallowedTools Bash Edit Write NotebookEdit Agent -- "$scionbook_prompt"
+    fi
+    # Writes ask for approval, as with Codex on-request.
+    exec claude --disallowedTools Agent -- "$scionbook_prompt"
+    ;;
+  *)
+    echo "Unsupported SCIONBOOK_CLIENT '$scionbook_client'; use codex or claude." >&2
+    exit 2
+    ;;
+esac

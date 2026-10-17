@@ -4,6 +4,7 @@ Use any workflow by sending `Read .agents/skills/<name>/SKILL.md and follow it: 
 Provide AGENTS.md and referenced files if your assistant cannot read the repository directly; see
 [assistant setup](assistant-setup.md). `$skill-name` in the examples is optional shorthand for clients
 with native skill discovery, not a terminal command. Replace bracketed placeholders with your details.
+Codex discovers `.agents/skills/`; Claude Code uses `.claude/skills` and `/skill-name`.
 
 For first use, complete the [installation steps](../README.md#get-started), then run `$setup` in a fresh
 Repository Maintainer chat. Setup includes the initial refresh. Later sessions use the saved files;
@@ -44,7 +45,7 @@ $setup [Character Name] on [Home World]
 ```
 
 ```text
-$setup [Lodestone profile URL], timezone America/New_York, public mode
+$setup [Lodestone profile URL], timezone [IANA timezone], public mode
 ```
 
 Setup resolves and verifies the character ID, asks for missing timezone/mode choices, initializes local
