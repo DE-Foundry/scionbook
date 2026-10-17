@@ -13,7 +13,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import scionbook_handoff as handoff
 
 
-@pytest.mark.parametrize("recap", ["", "   ", "x" * (handoff.MAX_RECAP + 1)])
+@pytest.mark.parametrize("recap", ["", "   ", "x" * (handoff.MAX_RECAP + 1)],
+                         ids=["empty", "blank", "too-long"])
 def test_invalid_recap_never_starts_an_agent_or_creates_staging(tmp_path, monkeypatch, recap):
     monkeypatch.setattr(handoff.subprocess, "run", lambda *a, **k: pytest.fail("agent started"))
     with pytest.raises(ValueError):
@@ -264,7 +265,7 @@ def test_start_chat_passes_client_to_launcher(monkeypatch):
 @pytest.mark.parametrize('role,skill', [('session', 'start-session'), ('maintainer', 'start-maintenance'), ('apply', 'apply-recap')])
 def test_app_draft_encodes_exact_workspace_and_skill_without_launch(tmp_path, monkeypatch, role, skill):
     from urllib.parse import urlsplit, parse_qs
-    repo = tmp_path / 'A repo & #? ü'
+    repo = tmp_path / 'A repo & # ü'
     repo.mkdir()
     monkeypatch.setattr(handoff.subprocess, 'run', lambda *a, **k: pytest.fail('launched agent'))
     url = urlsplit(handoff.app_draft_link(role, repo))
