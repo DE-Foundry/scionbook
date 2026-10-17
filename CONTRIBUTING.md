@@ -63,7 +63,27 @@ Examples: `feat(setup): add public-mode setup`, `fix(report): preserve unavailab
 a `BREAKING CHANGE:` footer. See standards.md and docs/releasing.md for SemVer and the compatibility
 contract. Do not rewrite existing history simply to retrofit commit style.
 
+Successful main test runs publish automatically, starting at 0.1.0. Keep RELEASE_NOTES.md current
+with changes, compatibility, and migration/rollback guidance before merging. Use a Conventional Commit
+squash title or Conventional Commits on the merged branch so version selection has the intended meaning.
+See docs/releasing.md for bump rules and retry behavior. PR and fork tests never publish releases.
+
 Never include real character names/IDs, character profile links, account links, personal information,
 credentials, player reports, or preferences in contributions, branches, tags, releases, commit messages,
 or author metadata. Use synthetic fixtures and a nonpersonal project Git identity. Private branches
 are not a data-storage exception; ignored runtime files must never be force-added.
+
+
+## Public CI and merge requirements
+
+Public contributions are welcome. Maintainers must approve workflow execution for outside contributors
+before CI runs. Never provide player credentials to CI. Required checks include the Python matrix,
+workflow/dependency checks, package smoke tests, and a Conventional Commit PR title. Keep the branch
+up to date and resolve review conversations before merging. Squash merge uses the PR title and body;
+put a breaking marker in the title and explain compatibility/migration in the body and RELEASE_NOTES.md.
+
+GitHub currently has one maintainer, so PRs and passing checks are required without a second-reviewer
+minimum. Revisit that minimum when another maintainer joins. CodeQL runs through GitHub default setup.
+Actions are pinned to full commit SHAs; Dependabot updates Python and Actions weekly. Dependabot's
+own generated branch names are an exception to the human branch naming convention.
+See [public-release controls and verification](docs/public-release.md).

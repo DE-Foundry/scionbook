@@ -98,7 +98,10 @@ authorized release against the established version baseline.
 
 Releases are reviewed source ZIPs built with `scripts/build_release.py`, with SHA-256 checksums.
 Retain the current version and three previous versions (four total); retain source tags for provenance.
-See docs/releasing.md for the compatibility contract, build procedure, and hosted cleanup.
+The first automated release is 0.1.0. Successful main test runs publish releases and enforce hosted
+retention; PRs, feature branches, and personal forks do not publish. See docs/releasing.md for the
+compatibility contract, commit-based version bumps, publication/retry procedure, and hosted cleanup.
+Keep RELEASE_NOTES.md current with reviewed changes and compatibility/migration guidance before merge.
 No character identity, profile/account link, personal information, or player state may enter tracked
 content, commit messages, author metadata, branches, tags, or release assets. Private project branches
 and forks are not exceptions. Use a nonpersonal project identity for published Git authorship.
@@ -113,3 +116,12 @@ clone a fork. Document both user methods in docs/installation.md; do not require
 Use one local directory per character, never character branches. Personal state remains ignored in all
 methods, including private forks. Application updates preserve local state; any saved-format changes
 need documented migration and rollback guidance. Updating source never implies setup or a refresh.
+
+
+## Public repository delivery
+
+Follow docs/public-release.md for the approved public-release procedure. Main requires PRs, current
+passing checks, and resolved conversations; force pushes and deletion are disabled. Squash PR titles
+must be Conventional Commits. Keep workflow tokens read-only except the tested-main release job.
+Pin Actions to full SHAs, review dependency updates, and require approval for outside contributors'
+workflows. Never expose player credentials to CI. Public forks do not publish automatically.

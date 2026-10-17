@@ -11,6 +11,7 @@ import build_release as release
 from test_export_release import source, git
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Synthetic symlink fixture needs POSIX; ZIP smoke covers Windows extraction")
 def test_zip_is_complete_and_materializes_adapter(source, tmp_path):
     (source / '.agents/skills/example').mkdir(parents=True)
     (source / '.agents/skills/example/SKILL.md').write_text('Synthetic instructions')

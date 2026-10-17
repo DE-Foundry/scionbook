@@ -17,17 +17,65 @@ PATCH, and incompatible changes increment MAJOR. During initial 0.y.z developmen
 changes increment MINOR and must still be clearly documented. A transparent migration preserving
 existing workflows does not itself break compatibility. Published contents are immutable.
 
-Stable releases use `vMAJOR.MINOR.PATCH` tags. The package builder currently accepts stable versions
-only; prerelease and build-metadata channels are not part of the publishing workflow. Select the
-initial baseline at the first authorized release; no tag or release is implied by this policy.
+Stable releases use `vMAJOR.MINOR.PATCH` tags. The initial automated release is **0.1.0**.
+The package builder currently accepts stable versions only; prerelease and build-metadata channels
+are not part of the publishing workflow.
 
 Keep the current release plus the previous three versions: four ZIP/checksum pairs total, ordered
 numerically by version. After verifying a new hosted release, remove older hosted release assets and
 release entries beyond that window. Keep source tags for provenance; never rewrite history merely to
-prune downloads. The builder enforces this window in its output directory. Hosted cleanup is a
-maintainer step, not an automated side effect of building locally.
+prune downloads. The builder enforces this window in its output directory. The automated publication job enforces
+the same window on GitHub only after downloading and verifying the newly published assets. Local
+builds never delete hosted releases. Drafts, prereleases, and non-versioned releases are left alone.
 
-## Build a release ZIP
+## Automatic publication after merge
+
+The `release` job in `.github/workflows/tests.yml` depends on the entire offline test matrix, workflow/dependency checks, and Linux/Windows ZIP smoke tests. A push
+to `main` in the source repository (including a merged PR) publishes once those tests pass. Feature
+branches, pull-request events, tags, and personal forks cannot publish through this job. A manual
+run of the **Tests** workflow on `main` also runs the matrix and can retry publication.
+The job uses the built-in GitHub token with `contents: write`; tests retain read-only permissions.
+No personal access token or player credentials are needed.
+
+The job checks out the exact tested commit with full history and tags. Publication is serialized,
+and an older run is skipped if a newer descendant is already tagged. The first version is `0.1.0`;
+subsequent versions use all non-merge commit messages since the highest stable version tag:
+
+- A `BREAKING CHANGE:` / `BREAKING-CHANGE:` footer or Conventional Commit `!` bumps MAJOR at 1.0.0+,
+  or MINOR while the major version is zero.
+- Otherwise, any `feat` commit bumps MINOR.
+- All other changes, including fixes, documentation, CI, and housekeeping, bump PATCH.
+
+Use Conventional Commits for individual commits and squash-merge titles. An ordinary merge includes
+its underlying commits in version analysis; the generated merge-message wrapper is ignored. Keep tags
+even after release retention deletes old download entries. Do not manually move or reuse version tags.
+
+Follow the [approved public-release procedure](public-release.md). Before merging, update `RELEASE_NOTES.md` with the release's changes, compatibility, migration, and
+rollback guidance. Its reviewed text is included in the GitHub release; commit author metadata and
+unreviewed commit bodies are not copied into release notes. Approval and merge authorize this automated
+publication; they do not authorize an assistant to merge or publish manually outside the workflow.
+
+Publication builds and privacy-checks the ZIP, creates a draft for the tested SHA, uploads ZIP/checksum,
+and downloads both to verify them against the local build before publishing. It verifies the published
+assets again before deleting older release entries and their assets. Source tags are retained.
+Fork owners who deliberately want their own releases must opt in by changing the fork guard themselves;
+ordinary fork updates never publish player data.
+
+### Retry a failed release
+
+Re-run the failed workflow for its original commit. A matching draft can have incomplete uploads
+replaced; a published release is only verified and never overwritten. A retry at an already released
+commit does not increment the version, and completes retention if publication previously succeeded.
+If an unfinished draft belongs to another commit, newer publication stops: finish the original run
+before proceeding. If draft repair needs a workflow fix, review/remove that unpublished draft before
+retrying the corrected main commit. Do not delete a published release to bypass a verification failure.
+Investigate an asset mismatch or divergent tag ancestry rather than changing existing release contents.
+
+For setup, enable Actions and allow the workflow's `contents: write` permission under repository or
+organization policy. The first successful main run containing this workflow publishes `v0.1.0` when no
+stable version tags exist; older merged commits without this job cannot publish retroactively.
+
+## Build a release ZIP locally
 
 1. Review shared files and history using the checklist below, run `python3 -m pytest tests/ -q`,
    and commit the intended source with a Conventional Commit. Do not include personal files.
@@ -42,9 +90,9 @@ maintainer step, not an automated side effect of building locally.
 4. Inspect `local/releases/scionbook-1.0.0.zip` and its `.zip.sha256` file. Extract into a fresh
    directory, install dependencies, and verify the documented setup files and skill adapters exist.
    The generated `VERSION` identifies the package. Never repackage an already published version.
-5. On separately authorized publication, tag the reviewed commit, upload the ZIP and checksum as
-   release assets, verify downloads, and enforce the hosted retention window above. Do not substitute
-   the hosting service's automatic source archive: it lacks the builder's adapter handling and checks.
+5. Normal publication is handled by the main workflow above. A local build is for inspection and does
+   not publish or tag anything. Do not substitute the hosting service's automatic source archive: it
+   lacks the builder's adapter handling and checks.
 
 The builder reads HEAD, rejects tracked edits, private filenames/storage directories, and known
 identifying terms, and refuses overwriting or building below retained versions. Retention removes

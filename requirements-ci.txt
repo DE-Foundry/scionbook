@@ -1,0 +1,2 @@
+-r requirements-dev.txt
+pip-audit>=2.9
