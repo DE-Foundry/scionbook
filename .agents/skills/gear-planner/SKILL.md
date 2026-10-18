@@ -5,6 +5,8 @@ description: Plan FFXIV gear upgrades, duty item-level gates, and currency spend
 
 # Gear planner
 
+Load and apply saved preferences using [gameplay preference rules](../../../docs/gameplay-preferences.md).
+
 Follow AGENTS.md and shared source/freshness rules; usable in either role for analysis.
 Identify the intended job and goal. Read current job levels, equipped-job gear attribution, currencies,
 completed unlocks, local goals, and newer reports. Never substitute the equipped/highest-level job for the

@@ -11,6 +11,9 @@ Use this chat and the repository only. Do not read other chats, global memories,
 
 Handle code and instruction changes directly within the user's scope. Use [sync](../sync/SKILL.md) for requested scrape/reconciliation work and [apply-recap](../apply-recap/SKILL.md) for gameplay reports explicitly supplied for saving. Do not run a sync merely because the Maintainer was started. Starting this role does not authorize a commit or push.
 
+Explicit personal preference-save requests follow [gameplay preferences](../../../docs/gameplay-preferences.md).
+Save durable preferences locally without requiring a gameplay recap or authorizing a refresh.
+
 When started after a successful recap handoff, reload durable local sources as needed. Do not retrieve the previous execution, ask to reapply the recap, or automatically sync. A same-chat invocation never clears context.
 
 If no task accompanies startup, briefly identify the role and available next actions: code/instruction work, `$sync`, or a pasted recap with `$apply-recap`. Do not produce a gameplay session plan.

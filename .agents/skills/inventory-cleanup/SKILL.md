@@ -5,6 +5,8 @@ description: Review FFXIV retainer inventory, consolidate stacks, protect needed
 
 # Inventory cleanup
 
+Load and apply saved preferences using [gameplay preference rules](../../../docs/gameplay-preferences.md).
+
 Follow AGENTS.md and shared source/freshness rules. This is analysis in either role, not a role switch.
 Read scionbook.json preferences, status.json warnings/gaps, local goals and newer player reports, and the
 matching cleanup.md (or report_md), plus quest_mats.json's protected_materials, material_reasons, and coverage_gaps.

@@ -5,6 +5,8 @@ description: Review FFXIV retainer listings, current market prices, recent sales
 
 # Market update
 
+Load and apply saved preferences using [gameplay preference rules](../../../docs/gameplay-preferences.md).
+
 Follow AGENTS.md and shared source/freshness rules. Analyze in either role without changing permissions.
 Read configured home world/data center, preferences, status.json timestamp/warnings/gaps, market_listings,
 recent_sales, all_rows, and newer reports. If holdings/listings are stale or unavailable, request Maintainer

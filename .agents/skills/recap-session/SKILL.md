@@ -13,7 +13,7 @@ Produce `What's worth saving from Session YYYY-MM-DD`, using the session's date 
 
 - The source snapshot's actual fetched_at_utc and the report's session date; distinguish player reports, snapshot facts, and externally verified corrections (retain useful source links).
 - Confirmed gameplay progress, exact known levels/equipment/purchases, completed quests/unlocks, and dated checked tasks (`- [x]`) with reset-cycle context where known.
-- Durable preferences and standing behavior changes, corrections to source files, and changes to active goals.
+- Changed durable priorities and routines under [gameplay preferences](../../../docs/gameplay-preferences.md), including exclusions, conditions, report date, and explicit replacement/removal intent. Preserve list order. Label session-only choices as temporary context, never as durable updates; keep completions separate. Include corrections and changed active goals without copying unchanged preferences.
 - Pending or unconfirmed outcomes and relevant uncertainties. Accepted quests, suggestions, queued duties, and proposed purchases remain pending. Use justified dates or user-supplied conditions for expiring notes, not invented deadlines.
 - The best starting point for the next session and any needed sync, especially after substantial inventory or quest progress. Mark sync as a separate future request after Lodestone has had time to update following logout, not an action authorized by applying the recap.
 

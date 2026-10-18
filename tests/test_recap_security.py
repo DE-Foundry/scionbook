@@ -18,6 +18,9 @@ def repo(tmp_path):
     skill = tmp_path / ".agents/skills/apply-recap/SKILL.md"
     skill.parent.mkdir(parents=True)
     skill.write_text("Synthetic skill: dated outcomes stay separate from routine boxes.\n")
+    preferences = tmp_path / "docs" / "gameplay-preferences.md"
+    preferences.parent.mkdir()
+    preferences.write_text("Synthetic preference precedence rules.")
     (tmp_path / "SCIONBOOK_MEMORY.md").write_text("# Memory v1\nExisting report\n")
     (tmp_path / "AGENTS.md").write_text("Trusted instructions\n")
     return tmp_path
@@ -250,12 +253,16 @@ def test_visible_unicode_and_layout_survive(repo):
 def test_skill_is_separate_from_data_and_timeout_releases_lock(repo, monkeypatch, client, newline):
     skill = newline.join(['Synthetic skill: Café 日本語', 'Keep dated outcomes separate.', ''])
     (repo / store.SKILL).write_bytes(skill.encode('utf-8'))
+    preferences = repo / 'docs' / 'gameplay-preferences.md'
+    preferences.parent.mkdir(exist_ok=True)
+    preferences.write_text('Synthetic preference precedence rules.')
     assert (repo / store.SKILL).read_bytes().decode('utf-8') == skill
     before = store.snapshot(repo)
     def timeout(command, **kwargs):
         prompt = kwargs['input']
         instruction, data = prompt.split('END TRUSTED INSTRUCTIONS\n', 1)
         assert skill in instruction
+        assert preferences.read_text() in instruction
         assert 'Injected recap instruction' not in instruction
         assert 'Injected recap instruction' in data
         assert kwargs['timeout'] == 600
@@ -418,3 +425,40 @@ def test_signal_handlers_restored_on_completion_and_timeout(timeout):
     else:
         assert handoff.run_proposal(command, input='', timeout=5, stdout=subprocess.PIPE, text=True).returncode == 0
     assert {s: signal.getsignal(s) for s in previous} == previous
+
+
+def test_gameplay_preference_recap_is_idempotent_without_refresh(repo):
+    before = store.snapshot(repo)
+    config = json.loads(before['scionbook.json'])
+    config['preferences']['gameplay'] = {'priorities': ['Explore optional areas'],
+                                       'combat_leveling_routine': []}
+    update = proposal('scionbook.json', json.dumps(config))
+    assert store.install(repo, before, update)['status'] == 'applied'
+    saved = store.snapshot(repo)
+    assert store.install(repo, saved, update)['status'] == 'unchanged'
+    assert store.snapshot(repo) == saved
+    assert saved['SCIONBOOK_MEMORY.md'] == before['SCIONBOOK_MEMORY.md']
+    assert not (repo / 'status.json').exists()
+    assert not (repo / 'quest_history.md').exists()
+
+
+def test_malformed_gameplay_recap_cannot_replace_config(repo):
+    before = store.snapshot(repo)
+    config = json.loads(before['scionbook.json'])
+    config['preferences']['gameplay'] = {'priorities': 'invalid list'}
+    with pytest.raises(ValueError):
+        store.install(repo, before, proposal('scionbook.json', json.dumps(config)))
+    assert store.snapshot(repo) == before
+
+
+@pytest.mark.parametrize('content', [None, '', ' \n\t'])
+def test_missing_preference_rules_stop_before_agent(repo, monkeypatch, content):
+    path = repo / 'docs' / 'gameplay-preferences.md'
+    if content is None:
+        path.unlink()
+    else:
+        path.write_text(content)
+    monkeypatch.setattr(handoff, 'run_proposal', lambda *a, **k: pytest.fail('agent started'))
+    with pytest.raises(ValueError, match='preferences document is missing or empty'):
+        handoff.apply_recap('Approved report', repo)
+    assert not list(repo.glob('.scionbook-recap*'))

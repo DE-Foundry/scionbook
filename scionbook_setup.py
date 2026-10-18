@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 import requests
 from bs4 import BeautifulSoup
 
-from scionbook_config import REPO, load_config, validate_config
+from scionbook_config import REPO, default_preferences, initial_preferences, load_config, validate_config
 
 from scionbook_http import LODESTONE, LODESTONE_HEADERS
 
@@ -113,9 +113,7 @@ def initialize(identity, timezone=None, mode=None, directory=REPO):
         "version": 1, **identity,
         "timezone": timezone or (old or {}).get("timezone", "UTC"),
         "mode": mode or (old or {}).get("mode", "full"),
-        "preferences": (old or {}).get("preferences", {
-            "platform": "unspecified", "input": "unspecified", "spoilers": "minimal",
-            "goals": [], "retainer_order": [], "inventory_policy": "conservative"})})
+        "preferences": old.get("preferences", default_preferences()) if old else initial_preferences(directory)})
     templates = REPO / "templates"
     pending = {name: (templates / name).read_text(encoding="utf-8")
                for name in ("SCIONBOOK_MEMORY.md", "SCIONBOOK_DAILY_WEEKLY_CHECKLIST.md")

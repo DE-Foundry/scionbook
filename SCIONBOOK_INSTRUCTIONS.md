@@ -1,4 +1,4 @@
-# Scionbook Instructions (v37)
+# Scionbook Instructions (v38)
 
 ## Purpose
 
@@ -49,6 +49,10 @@ Crafting protection lives in quest_turnins.json (research/keeps) and quest_mats.
 reasons, recipe cache). Inventory cleanup reads these saved files; sync maintains them as progression changes.
 
 ## Planning and records
+
+Load and apply saved priorities and combat-leveling routines using docs/gameplay-preferences.md.
+Newer explicit choices override the relevant saved preference; session-only choices stay temporary.
+Apply exclusions and job/level conditions without treating a routine as access or completion evidence.
 
 Recommend one primary objective, a short setup, useful detours, and a stopping point. Match the player's
 available time and preferences; do not impose a fixed MSQ/raid/crafting/collectible priority order.

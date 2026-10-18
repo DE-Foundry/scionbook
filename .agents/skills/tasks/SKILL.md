@@ -5,6 +5,8 @@ description: Track FFXIV session completions and gameplay progress only in the S
 
 # Tasks
 
+Load and apply saved preferences using [gameplay preference rules](../../../docs/gameplay-preferences.md).
+
 Follow the Session Planner boundary in root AGENTS.md. Use the five source files loaded by [start-session](../start-session/SKILL.md), re-reading relevant sections when needed. Consult available quest_history.md for dated unlock evidence; a new public setup has none. Current conversation reports override older readings without making the scrape fresh. In a Maintainer chat, direct gameplay tracking to a separate Session Planner chat.
 
 When the player reports progress:
