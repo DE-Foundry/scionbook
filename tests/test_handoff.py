@@ -28,6 +28,9 @@ def configured_repo(request, tmp_path):
         config = {"version": 1, "character_id": "123456", "name": "Example Hero",
                   "world": "Example", "data_center": "Example", "timezone": "UTC", "mode": "public"}
         (tmp_path / "scionbook.json").write_text(json.dumps(config))
+        skill = tmp_path / ".agents/skills/apply-recap/SKILL.md"
+        skill.parent.mkdir(parents=True)
+        skill.write_text("Synthetic skill: dated outcomes stay separate from routine boxes.\n")
 
 
 def proposal():

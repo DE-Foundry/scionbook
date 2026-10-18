@@ -5,13 +5,31 @@ import os
 from pathlib import Path
 import stat
 import tempfile
+import shutil
+import unicodedata
 
 from scionbook_config import validate_config
 
 OUTPUTS = ("SCIONBOOK_MEMORY.md", "SCIONBOOK_DAILY_WEEKLY_CHECKLIST.md", "scionbook.json")
 INPUTS = (*OUTPUTS, "status.json", "quest_history.md", "SCIONBOOK_INSTRUCTIONS.md",
           "AGENTS.md", "standards.md", ".agents/skills/apply-recap/SKILL.md")
+SKILL = ".agents/skills/apply-recap/SKILL.md"
 MAX_FILE = 2_000_000
+
+
+def hidden_controls(text):
+    return any(unicodedata.category(char) in {"Cf", "Cc"} and char not in "\n\r\t" for char in text)
+
+def hidden_json_controls(value):
+    if isinstance(value, str):
+        return hidden_controls(value)
+    if isinstance(value, dict):
+        return any(hidden_controls(key) or hidden_json_controls(item) for key, item in value.items())
+    if isinstance(value, list):
+        return any(hidden_json_controls(item) for item in value)
+    return False
+
+
 SCHEMA = {
     "type": "object", "additionalProperties": False,
     "properties": {
@@ -51,6 +69,8 @@ def snapshot(root):
     state = {name: read_file(root, name) for name in INPUTS}
     if state["scionbook.json"] is None:
         raise ValueError("Configure this checkout with setup before applying recaps.")
+    if not state[SKILL] or not state[SKILL].strip():
+        raise ValueError("The apply-recap skill is missing or empty; repair the installation.")
     validate_config(parse_json(state["scionbook.json"]))
     return state
 
@@ -94,7 +114,7 @@ def validate(proposal, original):
         if (not isinstance(item, dict) or set(item) != {"path", "content"}
                 or not isinstance(item["path"], str) or item["path"] not in OUTPUTS
                 or item["path"] in changes or not isinstance(item["content"], str)
-                or not item["content"].strip() or "\x00" in item["content"]):
+                or not item["content"].strip() or hidden_controls(item["content"])):
             raise ValueError("Invalid recap output; nothing was saved.")
         name, data = item["path"], item["content"].encode("utf-8")
         if len(data) > MAX_FILE:
@@ -102,6 +122,8 @@ def validate(proposal, original):
         if name == "scionbook.json":
             before, after = parse_json(original[name]), parse_json(data)
             validate_config(after)
+            if hidden_json_controls(after):
+                raise ValueError("Hidden control characters are not allowed in preferences.")
             if ({k: v for k, v in before.items() if k != "preferences"}
                     != {k: v for k, v in after.items() if k != "preferences"}):
                 raise ValueError("Recaps may change preferences only, never character configuration.")
@@ -120,6 +142,7 @@ def install(root, original, proposal):
     # Retained backups allow manual recovery after a process/machine crash. Never tracked.
     temporary = Path(tempfile.mkdtemp(prefix=".scionbook-recap-", dir=root))
     installed = []
+    cleanup = False
     try:
         for index, (name, data) in enumerate(changes.items()):
             with (temporary / f"new-{index}").open("wb") as output:
@@ -143,11 +166,12 @@ def install(root, original, proposal):
                 (root / name).unlink()
             else:
                 os.replace(temporary / f"old-{index}", root / name)
+        cleanup = all(read_file(root, name) == original[name] for name in changes)
         raise
     else:
+        cleanup = True
         return {"status": "applied", "summary": f"Saved and verified {len(changes)} recap file(s)."}
     finally:
-        # Preserve journals on failures; a later handoff must not silently proceed over them.
-        if all(read_file(root, name) == data for name, data in changes.items()):
-            import shutil
+        # Remove only verified successful saves or verified complete rollbacks.
+        if cleanup:
             shutil.rmtree(temporary)

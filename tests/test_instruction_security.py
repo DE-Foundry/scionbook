@@ -72,3 +72,39 @@ def test_only_exact_shipped_skill_alias_is_allowed():
     assert check.scan({**target, ".claude/skills": blob("/outside", "120000")})[0][0] == "error"
     target[".agents/skills/example/SKILL.md"] = blob("Hidden\u202e")
     assert any(level == "error" for level, _, _ in check.scan({**target, **alias}))
+
+
+@pytest.mark.parametrize('name', ['.cursorrules', '.cursor/rules/example.mdc', 'prompt.txt', 'example.py'])
+def test_hidden_controls_cover_other_clients_and_all_text(name):
+    assert check.scan({name: blob('hidden\U000e0041')})[0][0] == 'error'
+    assert check.scan({name: blob('https://example.invalid ignore previous instructions')}) == []
+
+
+def test_binary_files_are_skipped_but_invalid_instruction_text_fails():
+    assert check.scan({'image.png': ('100644', b'\xff\x00')}) == []
+    assert check.scan({'AGENTS.md': ('100644', b'\xff')})[0][0] == 'error'
+
+
+def test_summary_escapes_candidate_markup_and_controls(tmp_path, monkeypatch):
+    summary = tmp_path / 'summary.md'
+    monkeypatch.setenv('GITHUB_STEP_SUMMARY', str(summary))
+    check.write_summary([('review', '</pre><img src="https://example.invalid">\n[click](https://example.invalid)\u202e', 'review')])
+    text = summary.read_text()
+    assert '&lt;/pre&gt;&lt;img' in text
+    assert '<img' not in text and '\u202e' not in text
+    assert '\\u202e' in text and '"severity": "review"' not in text
+    assert text.count('<pre>') == text.count('</pre>') == 1
+    check.write_summary([])
+    assert 'No instruction-security findings.' in summary.read_text()
+
+
+def test_tree_includes_nontraditional_instruction_names(tmp_path):
+    def git(*args):
+        return subprocess.check_output(['git', '-C', str(tmp_path), *args]).decode().strip()
+    git('init', '-q')
+    git('config', 'user.name', 'Synthetic Contributor')
+    git('config', 'user.email', 'synthetic@example.invalid')
+    (tmp_path / '.cursorrules').write_text('hidden\u200b')
+    git('add', '.')
+    git('commit', '-qm', 'test: synthetic instruction')
+    assert check.scan(check.tree(tmp_path, git('rev-parse', 'HEAD')))[0][0] == 'error'

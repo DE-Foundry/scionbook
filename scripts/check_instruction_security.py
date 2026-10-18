@@ -2,7 +2,9 @@
 """Read Git objects as data; report instruction hazards without executing candidate code."""
 import argparse
 import json
-from pathlib import PurePosixPath
+import os
+import html
+from pathlib import Path, PurePosixPath
 import re
 import subprocess
 import unicodedata
@@ -38,8 +40,6 @@ def tree(repo, revision):
         metadata, raw_name = entry.split(b"\t", 1)
         mode, kind, oid = metadata.decode("ascii").split()
         name = raw_name.decode("utf-8", "strict")
-        if not relevant(name):
-            continue
         if kind != "blob":
             files[name] = (mode, b"")
             continue
@@ -64,10 +64,13 @@ def scan(candidate, baseline=None):
         try:
             text = raw.decode("utf-8")
         except UnicodeDecodeError:
-            findings.append(("error", name, "instruction input is not UTF-8"))
+            if relevant(name):
+                findings.append(("error", name, "instruction input is not UTF-8"))
             continue
         if any(unicodedata.category(char) in {"Cf", "Cc"} and char not in "\n\r\t" for char in name + text):
             findings.append(("error", name, "hidden or bidirectional control character"))
+        if not relevant(name):
+            continue
         previous = baseline.get(name, (None, b""))
         if previous == (mode, raw):
             continue
@@ -86,6 +89,20 @@ def scan(candidate, baseline=None):
     return findings
 
 
+def write_summary(findings):
+    destination = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not destination:
+        return
+    # JSON quotes controls; HTML escapes markup. Inside pre, Markdown is inert.
+    rows = [json.dumps({"severity": level, "path": name, "reason": reason}, ensure_ascii=True)
+            for level, name, reason in findings]
+    body = "\n".join(rows) if rows else "No instruction-security findings."
+    with Path(destination).open("a", encoding="utf-8") as stream:
+        stream.write("## Instruction security findings\n\n")
+        stream.write("Review findings require maintainer inspection even when the check is green.\n\n")
+        stream.write("<pre>" + html.escape(body) + "</pre>\n")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", default=".")
@@ -99,6 +116,7 @@ def main():
     # ASCII JSON avoids control/annotation injection from candidate filenames or content.
     print(json.dumps([{"severity": level, "path": name, "reason": reason}
                       for level, name, reason in findings], ensure_ascii=True, indent=2))
+    write_summary(findings)
     raise SystemExit(1 if any(level == "error" for level, _, _ in findings) else 0)
 
 

@@ -7,8 +7,9 @@ warning nor a keyword scan makes an agent immune to prompt injection.
 ## Source review
 
 `scripts/check_instruction_security.py` reads committed Git objects without importing candidate Python,
-checking out candidate files, following their links, installing dependencies, or calling a model. It scans
-Markdown, skills, templates, client configuration, workflows, scripts, and recap adapters. All Markdown
+checking out candidate files, following their links, installing dependencies, or calling a model. It checks hidden controls in every UTF-8 file, including other clients' rule files and text prompts.
+Review heuristics remain scoped to Markdown, skills, templates, client configuration, workflows, scripts,
+and recap adapters; binary files outside those instruction paths are skipped. All Markdown
 is included so referenced local documentation is covered; remote link contents are not fetched.
 
 The check fails on hidden/bidirectional controls, invalid UTF-8, unsupported linked instruction paths,
@@ -30,7 +31,9 @@ The normal `Tests / instruction-security` job also scans the tested tree and gat
 Review this bootstrap manually. After the next PR demonstrates a successful trusted run, add
 `instruction-review` and `instruction-security` to required status checks, retaining the existing checks.
 Repository settings are not changed by adding these files. Do not make a nonexistent check required
-before the bootstrap merges. Recheck this workflow before granting it any additional token permissions.
+before the bootstrap merges. After merging, a maintainer can comment `@dependabot rebase` on an open
+Dependabot PR to trigger the first trusted run, or use the next ordinary PR. The earlier dependency
+PRs #3 and #4 have already merged and cannot be used for this step. Recheck this workflow before granting it any additional token permissions.
 
 To inspect committed changes locally:
 
@@ -39,12 +42,14 @@ python3 -I scripts/check_instruction_security.py --head "$(git rev-parse HEAD)" 
 ```
 
 The command uses the local checker, so it is a development aid, not the trusted CI boundary. It prints
-ASCII JSON with paths and reasons, without source snippets. It does not read ignored player files.
+ASCII JSON with paths and reasons, without source snippets, and appends escaped findings to the GitHub
+step summary when available. Review findings are visible on the checks page even on a green run. It does not read ignored player files.
 
 ## Automated recap proposals
 
 The optional CLI recap handoff requires prior approval for the exact recap and a user-accessible terminal.
-It takes bounded snapshots of selected local files, then sends the approved recap, configuration, memory,
+It takes bounded snapshots of selected local files, includes the complete apply-recap skill as a separate
+trusted instruction section, then sends the approved recap, configuration, memory,
 checklist, status, and quest history to the selected client through stdin. These inputs contain private
 player data: use only a provider/client you authorize to process them. It does not send a whole transcript,
 Git history, scraper cookies, or unrelated environment variables.
@@ -56,7 +61,7 @@ It does not decide which paths Python can write. The deterministic installer per
 - `scionbook.json`, with every field other than `preferences` preserved.
 
 Unexpected fields, duplicate destinations, arbitrary paths, empty/oversized content, duplicate JSON keys,
-non-finite JSON values, linked inputs, character configuration changes, and model claims of `applied`
+non-finite JSON values, hidden control characters (including escaped JSON preference values), linked inputs, character configuration changes, and model claims of `applied`
 are rejected. All proposed files are validated before installation. Snapshots are compared again before
 writing; ordinary concurrent edits stop the save. File replacements are atomic individually and actual
 saved bytes are re-read before the launcher reports success. An identical proposal makes no writes.
@@ -75,7 +80,8 @@ Codex proposals request read-only/never, ephemeral execution, no user config or 
 shell tools and web search, and disabled memory/subagents. Claude proposals expose no built-in tools,
 load an empty strict MCP configuration, disable skills, hooks and browser integration, and omit user and
 project settings. Both receive their inputs in the prompt rather than browsing live player files.
-An unsupported CLI flag fails the handoff; never remove restrictions to make an older client work.
+Proposal runs time out after ten minutes, release the lock, and stop without installing files or starting
+the follow-up. An unsupported CLI flag fails the handoff; never remove restrictions to make an older client work.
 The installed clients' `--help` and official references were checked during implementation; offline tests
 verify construction and validation, not live model behavior on every client version/platform.
 
@@ -98,7 +104,8 @@ inside that boundary.
 `.scionbook-recap.lock` prevents overlapping helper runs. An interrupted installation retains an ignored
 `.scionbook-recap-*/` directory with `journal.json`, numbered new files, and available numbered old backups.
 It contains private player data and must never be committed or shared. Later handoffs stop while a journal
-or lock remains. Ordinary installation errors attempt rollback; process/machine crashes can leave a
+or lock remains. Ordinary installation errors attempt rollback and remove the journal only after all affected destinations
+verify against their original contents. Failed or unverifiable rollbacks retain recovery files; process/machine crashes can leave a
 partially installed set because multiple replacements are not one filesystem transaction.
 
 Before retrying, confirm no handoff process is running. Inspect the journal's ordered filenames and compare

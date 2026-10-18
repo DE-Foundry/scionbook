@@ -14,6 +14,7 @@ import scionbook_recap as recap_store
 
 REPO = Path(__file__).resolve().parent
 MAX_RECAP = 200_000
+PROPOSAL_TIMEOUT = 600
 # Supported agent CLIs. SCIONBOOK_CLIENT selects one for launchers and handoffs.
 CLIENTS = ("codex", "claude")
 CONFIG_FLAGS = ["--config", "agents.enabled=false",
@@ -89,7 +90,10 @@ def apply_recap(recap, repo=REPO, client=None):
                 "snapshots, timestamps, instructions, or any other file. Return full UTF-8 contents "
                 "for each proposed output, including identical contents when already applied. "
                 "If clarification is needed, return needs_input with no changes. No sync, commands, "
-                "other chats, or network lookups are authorized.\nAPPROVED RECAP AND SNAPSHOTS (JSON):\n"
+                "other chats, or network lookups are authorized.\n"
+                "TRUSTED APPLY-RECAP INSTRUCTIONS (use the automated CLI proposal route):\n"
+                + original[recap_store.SKILL].decode("utf-8")
+                + "\nEND TRUSTED INSTRUCTIONS\nAPPROVED RECAP AND SNAPSHOTS (JSON DATA):\n"
                 + json.dumps({"recap": recap, "files": {
                     name: data.decode("utf-8") if data is not None else None
                     for name, data in original.items() if name in recap_store.OUTPUTS
@@ -105,9 +109,12 @@ def apply_recap(recap, repo=REPO, client=None):
                            "--json-schema", json.dumps(RESULT_SCHEMA)]
             if os.environ.get("SCIONBOOK_MODEL"):
                 command[1:1] = ["--model", os.environ["SCIONBOOK_MODEL"]]
-            completed = subprocess.run(command, input=prompt, text=True, encoding="utf-8", cwd=temporary,
-                                       stdout=subprocess.DEVNULL if client == "codex" else subprocess.PIPE,
-                                       env=proposal_environment(client))
+            try:
+                completed = subprocess.run(command, input=prompt, text=True, encoding="utf-8", cwd=temporary,
+                                           stdout=subprocess.DEVNULL if client == "codex" else subprocess.PIPE,
+                                           env=proposal_environment(client), timeout=PROPOSAL_TIMEOUT)
+            except subprocess.TimeoutExpired as exc:
+                raise RuntimeError("Recap proposal timed out after 10 minutes; no files were installed or follow-up started.") from exc
             if completed.returncode:
                 raise RuntimeError("Recap proposal failed; no follow-up chat was started.")
             try:

@@ -15,6 +15,9 @@ def repo(tmp_path):
               "world": "Example", "data_center": "Example", "timezone": "UTC", "mode": "public",
               "preferences": {"focus": "exploration"}}
     (tmp_path / "scionbook.json").write_text(json.dumps(config))
+    skill = tmp_path / ".agents/skills/apply-recap/SKILL.md"
+    skill.parent.mkdir(parents=True)
+    skill.write_text("Synthetic skill: dated outcomes stay separate from routine boxes.\n")
     (tmp_path / "SCIONBOOK_MEMORY.md").write_text("# Memory v1\nExisting report\n")
     (tmp_path / "AGENTS.md").write_text("Trusted instructions\n")
     return tmp_path
@@ -117,7 +120,7 @@ def test_linked_outputs_rejected(repo, kind):
 
 def test_linked_input_parent_rejected(repo):
     external = repo / "external"
-    external.mkdir()
+    (repo / ".agents").rename(external)
     try:
         (repo / ".agents").symlink_to(external, target_is_directory=True)
     except OSError:
@@ -149,7 +152,7 @@ def test_child_environment_only_keeps_selected_auth(repo, monkeypatch):
     assert "OPENAI_API_KEY" not in claude and "ANTHROPIC_API_KEY" in claude
 
 
-def test_install_failure_rolls_back_and_blocks_retry_pending_review(repo, monkeypatch):
+def test_install_failure_rolls_back_and_allows_retry(repo, monkeypatch):
     before = store.snapshot(repo)
     update = proposal()
     update["changes"].append({"path": "SCIONBOOK_DAILY_WEEKLY_CHECKLIST.md", "content": "# Dated outcomes\n"})
@@ -162,10 +165,9 @@ def test_install_failure_rolls_back_and_blocks_retry_pending_review(repo, monkey
     with pytest.raises(OSError):
         store.install(repo, before, update)
     assert store.snapshot(repo) == before
-    assert list(repo.glob(".scionbook-recap-*/journal.json"))
-    with pytest.raises(RuntimeError, match="journal"):
-        with store.locked(repo):
-            pytest.fail("entered interrupted transaction")
+    assert not list(repo.glob(".scionbook-recap-*"))
+    with store.locked(repo):
+        pass
 
 
 def test_live_lock_blocks_second_handoff(repo):
@@ -221,3 +223,67 @@ def test_protected_source_change_during_install_rolls_back(repo, monkeypatch):
         store.install(repo, before, proposal())
     assert (repo / "SCIONBOOK_MEMORY.md").read_bytes() == before["SCIONBOOK_MEMORY.md"]
     assert (repo / "AGENTS.md").read_text() == "Concurrent instructions"
+
+
+@pytest.mark.parametrize('char', ['\U000e0041', '\u202e', '\u200b', '\x1b', '\x00'])
+@pytest.mark.parametrize('name', ['SCIONBOOK_MEMORY.md', 'SCIONBOOK_DAILY_WEEKLY_CHECKLIST.md', 'scionbook.json'])
+def test_hidden_characters_never_persist(repo, char, name):
+    before = store.snapshot(repo)
+    content = '# Report ' + char
+    if name == 'scionbook.json':
+        config = json.loads(before[name])
+        config['preferences']['focus'] = char
+        content = json.dumps(config)  # Unicode escapes must not evade validation.
+    with pytest.raises(ValueError):
+        store.install(repo, before, proposal(name, content))
+    assert store.snapshot(repo) == before
+
+
+def test_visible_unicode_and_layout_survive(repo):
+    content = '# Café 日本語\n\tDated outcome\r\n'
+    store.install(repo, store.snapshot(repo), proposal(content=content))
+    assert (repo / 'SCIONBOOK_MEMORY.md').read_bytes() == content.encode()
+
+
+@pytest.mark.parametrize('client', ['codex', 'claude'])
+def test_skill_is_separate_from_data_and_timeout_releases_lock(repo, monkeypatch, client):
+    skill = (repo / store.SKILL).read_text()
+    before = store.snapshot(repo)
+    def timeout(command, **kwargs):
+        prompt = kwargs['input']
+        instruction, data = prompt.split('END TRUSTED INSTRUCTIONS\n', 1)
+        assert skill in instruction
+        assert 'Injected recap instruction' not in instruction
+        assert 'Injected recap instruction' in data
+        assert kwargs['timeout'] == 600
+        raise handoff.subprocess.TimeoutExpired(command, kwargs['timeout'])
+    monkeypatch.setattr(handoff.subprocess, 'run', timeout)
+    with pytest.raises(RuntimeError, match='timed out'):
+        handoff.apply_recap('Injected recap instruction', repo, client=client)
+    assert store.snapshot(repo) == before
+    assert not list(repo.glob('.scionbook-recap*'))
+
+
+def test_missing_skill_stops_before_agent(repo, monkeypatch):
+    (repo / store.SKILL).unlink()
+    monkeypatch.setattr(handoff.subprocess, 'run', lambda *a, **k: pytest.fail('agent started'))
+    with pytest.raises(ValueError, match='skill'):
+        handoff.apply_recap('Approved report', repo)
+
+
+def test_failed_rollback_retains_journal_and_blocks_retry(repo, monkeypatch):
+    before = store.snapshot(repo)
+    update = proposal()
+    update['changes'].append({'path': 'SCIONBOOK_DAILY_WEEKLY_CHECKLIST.md', 'content': '# Outcomes\n'})
+    replace = store.os.replace
+    def fail(source, destination):
+        if Path(source).name in ('new-1', 'old-0'):
+            raise OSError('Synthetic installation and rollback failure')
+        replace(source, destination)
+    monkeypatch.setattr(store.os, 'replace', fail)
+    with pytest.raises(OSError):
+        store.install(repo, before, update)
+    assert list(repo.glob('.scionbook-recap-*/journal.json'))
+    with pytest.raises(RuntimeError, match='journal'):
+        with store.locked(repo):
+            pytest.fail('entered failed transaction')
