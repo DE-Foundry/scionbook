@@ -251,3 +251,49 @@ def test_report_rejects_wrong_pricing_data_center(monkeypatch, tmp_path):
     with pytest.raises(SystemExit, match="differs from configuration"):
         report.main()
     assert out.read_text() == "Previous snapshot"
+
+
+def test_pre_setup_preferences_import_once(tmp_path):
+    seed = tmp_path / 'local' / 'gameplay-preferences.json'
+    seed.parent.mkdir()
+    preferences = {'gameplay': {'priorities': ['Explore optional areas'],
+                               'combat_leveling_routine': ['Use a chosen activity when available']}}
+    seed.write_text(json.dumps({'preferences': preferences}))
+    saved = setup.initialize(IDENTITY, directory=tmp_path)
+    assert saved['preferences']['gameplay'] == preferences['gameplay']
+    assert saved['preferences']['inventory_policy'] == 'conservative'
+    assert not (tmp_path / 'status.json').exists()
+    seed.write_text('invalid obsolete seed')
+    assert setup.initialize(IDENTITY, directory=tmp_path) == saved
+
+
+@pytest.mark.parametrize('seed', [
+    {'preferences': {'gameplay': []}},
+    {'preferences': {'gameplay': {'priorities': 'Explore'}}},
+    {'preferences': {'gameplay': {'combat_leveling_routine': ['']}}},
+    {'preferences': {}, 'character_id': '999'},
+    [],
+])
+def test_invalid_seed_does_not_initialize_state(tmp_path, seed):
+    path = tmp_path / 'local' / 'gameplay-preferences.json'
+    path.parent.mkdir()
+    path.write_text(json.dumps(seed))
+    with pytest.raises(ValueError):
+        setup.initialize(IDENTITY, directory=tmp_path)
+    assert not (tmp_path / 'scionbook.json').exists()
+    assert not (tmp_path / 'SCIONBOOK_MEMORY.md').exists()
+
+
+@pytest.mark.parametrize('preferences', [
+    {}, {'goals': ['Explore'], 'custom': True},
+    {'gameplay': {}}, {'gameplay': {'priorities': [], 'combat_leveling_routine': []}},
+])
+def test_optional_gameplay_preferences_preserve_legacy(preferences):
+    assert config.validate_preferences(preferences) == preferences
+
+
+@pytest.mark.parametrize('gameplay', [None, [], {'priorities': [42]},
+                                      {'priorities': ['  ']}, {'combat_leveling_routine': False}])
+def test_invalid_gameplay_preferences_rejected(gameplay):
+    with pytest.raises(ValueError):
+        config.validate_preferences({'gameplay': gameplay})

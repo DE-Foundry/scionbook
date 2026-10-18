@@ -50,7 +50,10 @@ compaction, resume/fork, nor invoking a different skill resets context. Runtime 
 Specialist skills own detailed cleanup, market, gearing, and hunt procedures. Core instructions route to them.
 Hunt plans default to practical travel order, grouping nearby suitable targets and separating skipped or
 conditional marks; verify travel dependencies and state the proposed start when the current location is unknown.
-Personal preferences belong in scionbook.json or dated local memory, not shared skill text.
+Personal preferences follow docs/gameplay-preferences.md: preferences.gameplay in scionbook.json
+is the current durable baseline; dated local memory holds attributed changes/history. An ignored
+local/gameplay-preferences.json seed is allowed before setup. Keep ordered priorities, standing
+routines, session-only overrides, and completed outcomes distinct; never embed them in shared text.
 Never commit or push player data, including to private branches. Sync only saves local ignored files.
 
 ## Inventory and market recommendations

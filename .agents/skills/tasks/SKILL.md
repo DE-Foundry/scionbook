@@ -5,6 +5,12 @@ description: Track FFXIV session completions and gameplay progress only in the S
 
 # Tasks
 
+Read scionbook.json `preferences.gameplay` and follow
+[gameplay preferences](../../../docs/gameplay-preferences.md). Apply ordered priorities
+and relevant standing routines, including exclusions and job/level conditions. Newer
+explicit conversation choices take precedence; session-only overrides remain temporary.
+Keep durable changes, session choices, and confirmed outcomes separate.
+
 Follow the Session Planner boundary in root AGENTS.md. Use the five source files loaded by [start-session](../start-session/SKILL.md), re-reading relevant sections when needed. Consult available quest_history.md for dated unlock evidence; a new public setup has none. Current conversation reports override older readings without making the scrape fresh. In a Maintainer chat, direct gameplay tracking to a separate Session Planner chat.
 
 When the player reports progress:

@@ -12,7 +12,8 @@ from scionbook_config import validate_config
 
 OUTPUTS = ("SCIONBOOK_MEMORY.md", "SCIONBOOK_DAILY_WEEKLY_CHECKLIST.md", "scionbook.json")
 INPUTS = (*OUTPUTS, "status.json", "quest_history.md", "SCIONBOOK_INSTRUCTIONS.md",
-          "AGENTS.md", "standards.md", ".agents/skills/apply-recap/SKILL.md")
+          "AGENTS.md", "standards.md", ".agents/skills/apply-recap/SKILL.md",
+          "docs/gameplay-preferences.md")
 SKILL = ".agents/skills/apply-recap/SKILL.md"
 MAX_FILE = 2_000_000
 

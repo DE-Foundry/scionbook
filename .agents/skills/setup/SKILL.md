@@ -10,6 +10,8 @@ chat, direct setup to a separate Maintainer chat. This request authorizes local 
 initial refresh, not Git publishing. Read README.md for installation and commands.
 
 1. Inspect scionbook.json and existing local state before doing anything. One character per checkout.
+   Read [gameplay preferences](../../../docs/gameplay-preferences.md). First initialization imports
+   a validated local/gameplay-preferences.json seed if present; reruns ignore it.
    Preserve configured preferences and existing progress on reruns; use a separate checkout for another character.
 2. Take the full character name and **home world** from the request. Ask only if missing. Accept an official
    Lodestone profile URL or numeric ID as a fallback. Never use a default/example character.

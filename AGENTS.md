@@ -7,6 +7,16 @@ Shared conventions live in standards.md. Personal configuration and preferences 
 player reports live in SCIONBOOK_MEMORY.md and SCIONBOOK_DAILY_WEEKLY_CHECKLIST.md.
 Personal files are local and ignored by Git; templates contain no player state.
 
+## Personal gameplay preferences
+
+Follow docs/gameplay-preferences.md for storage, precedence, and recap rules. Load
+scionbook.json preferences.gameplay before planning or specialist recommendations. Newer
+explicit conversation preferences take precedence; session-only choices do not rewrite
+durable priorities. Keep preferences, proposed actions, and completed outcomes separate.
+Maintainer may save explicitly supplied preferences without a gameplay recap or sync;
+Session Planner remains conversation-only. Missing configuration uses the documented
+ignored pre-setup seed, never invented identity.
+
 ## Assistant portability
 
 These instructions apply to any assistant. Read workflows directly from `.agents/skills/<name>/SKILL.md`;

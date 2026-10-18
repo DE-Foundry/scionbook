@@ -5,6 +5,12 @@ description: Look up FFXIV hunt mark targets supplied by the user and organize t
 
 # Hunt planner
 
+Read scionbook.json `preferences.gameplay` and follow
+[gameplay preferences](../../../docs/gameplay-preferences.md). Apply ordered priorities
+and relevant standing routines, including exclusions and job/level conditions. Newer
+explicit conversation choices take precedence; session-only overrides remain temporary.
+Keep durable changes, session choices, and confirmed outcomes separate.
+
 Read root AGENTS.md and standards.md. This is a read-only game-reference lookup usable in either scionbook role without switching roles or starting a gameplay session. Never write files, scrape character data, run sync, or infer hunt completion. Use public enemy/location references, not character databases.
 
 ## Input and lookup
