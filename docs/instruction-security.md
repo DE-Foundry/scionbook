@@ -88,7 +88,10 @@ shell tools and web search, and disabled memory/subagents. Claude proposals expo
 load an empty strict MCP configuration, disable skills, hooks and browser integration, and omit user and
 project settings. Both receive their inputs in the prompt rather than browsing live player files.
 Proposal runs time out after ten minutes. The adapter creates a new process session on Linux/macOS
-and kills its process group on timeout or interruption. On Windows it creates a new process group and
+and kills its process group on timeout or interruption. While waiting on Linux/macOS, temporary
+SIGTERM/SIGHUP handlers route launcher termination through the same cleanup and lock-release path,
+then restore the previous handlers. Repeated termination signals are ignored during that cleanup.
+This signal handling requires the main Python thread; SIGKILL or machine failure cannot be handled. On Windows it creates a new process group and
 uses `taskkill /T /F` against the wrapper PID to terminate its tree. Cleanup precedes releasing the lock;
 no proposal is installed and no follow-up starts. These controls do not contain deliberately detached
 processes from a malicious client. Client stderr is captured, never streamed to the terminal. Failure

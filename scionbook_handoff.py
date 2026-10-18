@@ -50,9 +50,23 @@ def run_proposal(command, *, input, timeout, **kwargs):
                 else {"start_new_session": True})
     with subprocess.Popen(command, stdin=subprocess.PIPE, stderr=subprocess.PIPE,
                           **grouping, **kwargs) as process:
+        previous_handlers = {}
+
+        def interrupted(signum, frame):
+            # Let the first signal trigger cleanup; repeats must not interrupt reaping.
+            for watched in previous_handlers:
+                signal.signal(watched, signal.SIG_IGN)
+            raise RuntimeError(f"Recap proposal interrupted by {signal.Signals(signum).name}; no follow-up started.")
+
         try:
+            if not PROCESS_WINDOWS:
+                for watched in (signal.SIGTERM, signal.SIGHUP):
+                    previous_handlers[watched] = signal.getsignal(watched)
+                    signal.signal(watched, interrupted)
             stdout, stderr = process.communicate(input, timeout=timeout)
         except BaseException:
+            for watched in previous_handlers:
+                signal.signal(watched, signal.SIG_IGN)
             if PROCESS_WINDOWS:
                 killed = subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"],
                                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -67,6 +81,9 @@ def run_proposal(command, *, input, timeout, **kwargs):
                     pass
             process.communicate()
             raise
+        finally:
+            for watched, handler in previous_handlers.items():
+                signal.signal(watched, handler)
         return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
 
 

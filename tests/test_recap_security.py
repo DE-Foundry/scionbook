@@ -351,3 +351,70 @@ def test_client_stderr_is_captured_and_not_echoed(capsys):
     assert 'synthetic private payload' in result.stderr
     assert 'synthetic private payload' not in handoff.failure_detail(result.stderr)
     assert capsys.readouterr().err == ''
+
+
+@pytest.mark.skipif(handoff.PROCESS_WINDOWS, reason='POSIX termination signals')
+@pytest.mark.parametrize('signal_name', ['SIGTERM', 'SIGHUP'])
+def test_launcher_termination_reaps_children_releases_lock_and_restores_handlers(tmp_path, signal_name):
+    import os
+    import signal
+    import subprocess
+    import sys
+    import time
+    heartbeat = tmp_path / 'heartbeat'
+    wrapper_pid = tmp_path / 'wrapper.pid'
+    child = 'import time; from pathlib import Path; p=Path(' + repr(str(heartbeat)) + ')\n'
+    child += "while True:\n with p.open('ab') as f: f.write(b'x')\n time.sleep(.03)\n"
+    wrapper = 'import os,subprocess,sys,time; from pathlib import Path; '
+    wrapper += 'Path(' + repr(str(wrapper_pid)) + ').write_text(str(os.getpid())); '
+    wrapper += 'subprocess.Popen([sys.executable,"-c",' + repr(child) + ']); time.sleep(60)'
+    launcher = 'import signal,subprocess,sys; from pathlib import Path; '
+    launcher += 'sys.path.insert(0,' + repr(str(handoff.REPO)) + '); import scionbook_handoff as h; import scionbook_recap as s\n'
+    launcher += 'def prior(signum, frame): pass\n'
+    launcher += 'signal.signal(signal.SIGTERM, prior); signal.signal(signal.SIGHUP, prior)\n'
+    launcher += 'try:\n with s.locked(Path(' + repr(str(tmp_path)) + ')):\n'
+    launcher += '  h.run_proposal([sys.executable,"-c",' + repr(wrapper) + '], input="", timeout=30, text=True, encoding="utf-8", stdout=subprocess.PIPE)\n'
+    launcher += 'except RuntimeError as error:\n'
+    launcher += ' assert "interrupted by" in str(error)\n'
+    launcher += ' assert signal.getsignal(signal.SIGTERM) is prior\n assert signal.getsignal(signal.SIGHUP) is prior\n'
+    launcher += ' print("cleanup verified")\n'
+    process = subprocess.Popen([sys.executable, '-c', launcher], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    try:
+        deadline = time.monotonic() + 10
+        while not heartbeat.exists() and time.monotonic() < deadline and process.poll() is None:
+            time.sleep(.02)
+        assert heartbeat.exists(), 'Synthetic child did not start'
+        assert (tmp_path / '.scionbook-recap.lock').exists()
+        os.kill(process.pid, getattr(signal, signal_name))
+        stdout, stderr = process.communicate(timeout=10)
+        assert process.returncode == 0, stderr
+        assert stdout.strip() == 'cleanup verified'
+        assert not (tmp_path / '.scionbook-recap.lock').exists()
+        size = heartbeat.stat().st_size
+        time.sleep(.15)
+        assert heartbeat.stat().st_size == size
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait()
+        if wrapper_pid.exists():
+            try:
+                os.killpg(int(wrapper_pid.read_text()), signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
+
+@pytest.mark.skipif(handoff.PROCESS_WINDOWS, reason='POSIX signal handlers')
+@pytest.mark.parametrize('timeout', [False, True])
+def test_signal_handlers_restored_on_completion_and_timeout(timeout):
+    import signal
+    import subprocess
+    import sys
+    previous = {s: signal.getsignal(s) for s in (signal.SIGTERM, signal.SIGHUP)}
+    command = [sys.executable, '-c', 'import time; time.sleep(30)' if timeout else 'pass']
+    if timeout:
+        with pytest.raises(subprocess.TimeoutExpired):
+            handoff.run_proposal(command, input='', timeout=.1, stdout=subprocess.PIPE, text=True)
+    else:
+        assert handoff.run_proposal(command, input='', timeout=5, stdout=subprocess.PIPE, text=True).returncode == 0
+    assert {s: signal.getsignal(s) for s in previous} == previous
