@@ -94,3 +94,10 @@ own generated branch names are an exception to the human branch naming conventio
 Before web merges, enable GitHub email privacy as described in
 [contributor identity guidance](docs/releasing.md#contributor-identity-and-github-web-merges).
 See [public-release controls and verification](docs/public-release.md).
+
+## Instruction and adapter changes
+
+Treat skills, templates, referenced documentation, client settings, and handoff code as executable product
+behavior. Review new destinations, permissions, hooks, and changes to security checks explicitly. Follow
+[instruction security](docs/instruction-security.md) for the trusted-base CI check, synthetic adversarial
+tests, and rollout requirements. Passing a static check does not establish that an instruction is safe.
