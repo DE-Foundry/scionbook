@@ -74,7 +74,8 @@ Add compatibility/migration guidance to RELEASE_NOTES.md when a change requires 
 
 Never include real character names/IDs, character profile links, account links, personal information,
 credentials, player reports, or preferences in contributions, branches, tags, releases, commit messages,
-or author metadata. Use synthetic fixtures and a nonpersonal project Git identity. Private branches
+or author metadata. Public GitHub contributor handles and their noreply addresses are permitted
+attribution; keep them out of private denylists. Use synthetic fixtures and a nonpersonal project Git identity. Private branches
 are not a data-storage exception; ignored runtime files must never be force-added.
 
 
@@ -90,4 +91,6 @@ GitHub currently has one maintainer, so PRs and passing checks are required with
 minimum. Revisit that minimum when another maintainer joins. CodeQL runs through GitHub default setup.
 Actions are pinned to full commit SHAs; Dependabot updates Python and Actions weekly. Dependabot's
 own generated branch names are an exception to the human branch naming convention.
+Before web merges, enable GitHub email privacy as described in
+[contributor identity guidance](docs/releasing.md#contributor-identity-and-github-web-merges).
 See [public-release controls and verification](docs/public-release.md).

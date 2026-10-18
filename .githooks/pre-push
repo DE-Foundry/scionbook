@@ -1,6 +1,6 @@
 #!/bin/sh
 # Git for Windows supplies sh; select an available Python 3 interpreter.
-if command -v python3 >/dev/null 2>&1; then
+if python3 -c '' >/dev/null 2>&1; then
     exec python3 scripts/check_push.py
 fi
 exec python scripts/check_push.py

@@ -44,9 +44,11 @@ subsequent versions use all non-merge commit messages since the highest stable v
 - A `BREAKING CHANGE:` / `BREAKING-CHANGE:` footer or Conventional Commit `!` bumps MAJOR at 1.0.0+,
   or MINOR while the major version is zero.
 - Otherwise, any `feat` commit bumps MINOR.
-- Ranges containing only `ci`, `test`, `docs`, or `chore` commits do not publish. Those subjects
-  remain in the range for the next release. Changes to `requirements.txt` always warrant at least a
-  PATCH so runtime dependency/security updates reach ZIP users.
+- Ranges containing only `ci`, `test`, `docs`, or `chore` commits can skip publication. Those subjects
+  remain in the range for the next release. Skipping also requires every changed path to be under
+  `.github/` or `tests/`, or exactly `requirements-dev.txt` or `requirements-ci.txt`. Changes to any other
+  path warrant at least a PATCH, including skills, templates, documentation, runtime dependencies, and
+  removed/renamed product files. Markdown can change agent behavior and is part of the shipped product.
 - Other changes bump PATCH. Breaking markers take precedence over maintenance filtering.
 
 Use Conventional Commits for individual commits and squash-merge titles. An ordinary merge includes
@@ -55,7 +57,9 @@ even after release retention deletes old download entries. Do not manually move 
 
 Follow the [approved public-release procedure](public-release.md). Generated notes list non-merge commit
 subjects since the previous stable tag (reviewed squash PR titles). Author metadata and commit bodies
-are not copied. `RELEASE_NOTES.md` is an optional reviewed compatibility/migration appendix: it is appended
+are not copied. Generated notes and existing draft notes are scanned using the release denylist before
+creation/publication; a match stops the job without printing the term. `RELEASE_NOTES.md` is an optional
+reviewed compatibility/migration appendix: it is appended
 only when changed relative to the previous release, or when present for the first release. Update it
 when a change needs installation, migration, backup, or rollback guidance; routine dependency PRs need
 no manual notes edit. Approval and merge authorize automated publication, not an assistant merge.
@@ -92,9 +96,13 @@ agent-assisted contributors. ZIP-only users who do not use Git do not need a hoo
 
 1. Create `.scionbook-release-denylist` in the repository root using a local editor. Add the identifying
    terms you want kept private, one per line. Include character names, Lodestone character IDs, retainer
-   names, real names, personal email addresses, private account handles, and personal profile URLs as
-   applicable. Contributors without characters should still protect their personal identifiers.
-2. Use distinctive terms of at least four characters. Matching is case-insensitive and checks substrings.
+   names, real names, private email addresses, private account handles, and personal profile URLs as
+   applicable. Do not include the public GitHub contributor handle or GitHub-provided noreply address:
+   these are expected public attribution on PRs and commits. Contributors without characters should
+   still protect their personal identifiers.
+2. Use distinctive terms of at least four characters. Matching is case-insensitive and checks substrings,
+   including multiword names joined with
+   punctuation/underscores, concatenated names, and percent-encoded URL forms.
    Blank lines and lines beginning with `#` are ignored. Avoid generic world/job names or ordinary words
    that would match legitimate source text. Do not add passwords or tokens; use credential scanning for
    secrets. Local character/snapshot identities are also loaded automatically when available, but a
@@ -129,14 +137,38 @@ reachable commit files, commit messages/author metadata, and pushed ref names, i
 before the tip. It fails closed without effective terms. Existing custom hook configurations are not
 overwritten; integrate `python3 scripts/check_push.py` into the existing pre-push hook, passing its stdin.
 Hooks require installation in each clone and can be bypassed; they supplement review, not enforce it
-for every contributor. Use a nonpersonal Git identity before committing. A finding in history requires
-private investigation; deleting the file at HEAD does not remove it from a push.
+for every contributor. Use a nonpersonal Git identity before committing (see below). A finding in
+history requires private investigation; deleting the file at HEAD does not remove it from a push.
+
+### Contributor identity and GitHub web merges
+
+Before merging, each maintainer must enable **Keep my email addresses private** in
+[GitHub email settings](https://github.com/settings/emails). GitHub uses a noreply address for web commits
+and merges when this is enabled; a local hook cannot inspect commits created on GitHub. See
+[GitHub's commit email guidance](https://docs.github.com/en/account-and-profile/how-tos/email-preferences/setting-your-commit-email-address).
+For local commits, configure a project identity or the GitHub-provided noreply address in Git. The public
+GitHub handle and its noreply attribution are permitted; do not add them to the privacy denylist. This
+exception does not permit character/account links, private handles, or personal email addresses.
+
+Changing settings does not anonymize existing commits. The hook scans all reachable history, so a newly
+added private email may reveal an old exposure and block subsequent pushes. Resolve that finding with
+an explicit owner decision about coordinated history cleanup versus accepting the existing exposure;
+do not silently remove the term, bypass the hook, or rewrite shared history. Accepting an exposure does
+not itself configure a scanner exception; any such implementation requires separate review. Do not copy
+the identifying value into an issue or PR while discussing the finding.
+
+The hook currently rescans all reachable commits. If measured push latency becomes a problem, consider
+a reviewed local cache keyed by both commit SHA and a hash of effective denylist terms, invalidated when
+scanner rules change. No persistent scan cache or historical allowlist is implemented today.
+
+### Release-job privacy backstop
 
 Maintainers must separately configure the Actions secret `SCIONBOOK_RELEASE_DENYLIST` with the
 identifying terms relevant to the release repository, using the same one-term-per-line format. The local
 file and secret serve different stages; neither replaces the other. GitHub secrets are not downloaded
 into local checkouts. Ordinary contributors need only their local file and hook; do not send private
-denylists to maintainers or add secrets to a personal fork merely to use it. Only the release step receives it; PR/test/package jobs never do. `build_release.build` fails
+denylists to maintainers or add secrets to a personal fork merely to use it. Only the release step
+receives the secret; PR/test/package jobs never do. `build_release.build` fails
 closed under CI without effective terms. Package smoke tests explicitly use structural-only mode
 (`require_terms=False`) to test installation without exposing private terms; they do not certify content
 privacy. Local builds scan available terms but cannot certify absent or unknown identifiers. No term

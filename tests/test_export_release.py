@@ -98,3 +98,19 @@ def test_short_terms_are_ignored_to_avoid_false_matches():
 def test_this_repository_tracks_no_personal_state():
     tracked = git(Path(__file__).resolve().parent.parent, "ls-files").splitlines()
     assert export.personal_paths(tracked) == []
+
+
+@pytest.mark.parametrize('variant', [
+    'zqxw vbnm marker', 'zqxw-vbnm-marker', 'zqxw_vbnm_marker',
+    'ZqxwVbnmMarker', 'zqxw%20vbnm%20marker', 'zqxw%2Dvbnm%5Fmarker',
+])
+@pytest.mark.parametrize('location', ['path', 'content'])
+def test_scan_detects_slug_and_url_variants(variant, location):
+    files = {f'docs/{variant}.md': b'neutral'} if location == 'path' else {
+        'notes.md': f'https://example.invalid/{variant}'.encode()}
+    assert export.scan(files, {'Zqxw Vbnm Marker'})
+
+
+def test_scan_escapes_literal_regex_characters():
+    assert export.scan({'notes.md': b'privateXemail@exampleYinvalid'}, {'private.email@example.invalid'}) == []
+    assert export.scan({'notes.md': b'private.email@example.invalid'}, {'private.email@example.invalid'})

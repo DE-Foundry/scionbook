@@ -172,3 +172,63 @@ def test_published_retry_verifies_hosted_checksum_without_rebuild(tmp_path, monk
             hashlib.sha256(b'original compression').hexdigest() + '  ' + artifact.name)
     monkeypatch.setattr(release, 'gh', download)
     release.verify('v0.1.0', artifact, False)
+
+
+@pytest.mark.parametrize('path', ['.agents/skills/example/SKILL.md', 'templates/example.md',
+                                  'README.md', 'scripts/example.py', 'requirements.txt'])
+def test_maintenance_title_releases_product_paths(source, path):
+    git(source, 'tag', 'v0.1.0')
+    file = source / path
+    file.parent.mkdir(parents=True, exist_ok=True)
+    file.write_text('Synthetic behavior update')
+    git(source, 'add', path)
+    git(source, 'commit', '-qm', 'docs: update shipped behavior')
+    assert release.plan([]) == '0.1.1'
+
+
+@pytest.mark.parametrize('path', ['.github/workflows/example.yml', 'tests/example.py',
+                                  'requirements-dev.txt', 'requirements-ci.txt'])
+def test_maintenance_paths_can_skip(source, path):
+    git(source, 'tag', 'v0.1.0')
+    file = source / path
+    file.parent.mkdir(parents=True, exist_ok=True)
+    file.write_text('Synthetic maintenance')
+    git(source, 'add', path)
+    git(source, 'commit', '-qm', 'chore: maintenance')
+    assert release.plan([]) is None
+
+
+def test_rename_product_into_tests_still_releases(source):
+    git(source, 'tag', 'v0.1.0')
+    (source / 'tests').mkdir()
+    git(source, 'mv', 'README.md', 'tests/README.md')
+    git(source, 'commit', '-qm', 'chore: move file')
+    assert release.plan([]) == '0.1.1'
+
+
+@pytest.mark.parametrize('appendix', [False, True])
+def test_private_notes_block_before_github_create(source, tmp_path, monkeypatch, appendix):
+    monkeypatch.setenv('SCIONBOOK_RELEASE_DENYLIST', 'Synthetic Private Identifier')
+    if appendix:
+        (source / 'RELEASE_NOTES.md').write_text('SyntheticPrivateIdentifier')
+        git(source, 'add', 'RELEASE_NOTES.md')
+        git(source, 'commit', '-qm', 'fix: neutral title')
+    else:
+        git(source, 'commit', '--allow-empty', '-qm', 'fix: synthetic-private-identifier')
+    monkeypatch.setattr(release, 'releases', lambda: [])
+    monkeypatch.setattr(release.package, 'build', lambda *a: tmp_path / 'scionbook-0.1.0.zip')
+    monkeypatch.setattr(release, 'gh', lambda *a: pytest.fail('GitHub mutation before privacy validation'))
+    with pytest.raises(ValueError, match='Privacy check failed in release notes'):
+        release.publish()
+
+
+def test_private_draft_notes_block_publication(source, tmp_path, monkeypatch):
+    monkeypatch.setenv('SCIONBOOK_RELEASE_DENYLIST', 'Synthetic Private Identifier')
+    row = {'tag_name': 'v0.1.0', 'draft': True, 'prerelease': False,
+           'target_commitish': git(source, 'rev-parse', 'HEAD').strip(),
+           'body': 'Synthetic%20Private%20Identifier'}
+    monkeypatch.setattr(release, 'releases', lambda: [row])
+    monkeypatch.setattr(release.package, 'build', lambda *a: tmp_path / 'scionbook-0.1.0.zip')
+    monkeypatch.setattr(release, 'gh', lambda *a: pytest.fail('GitHub mutation before privacy validation'))
+    with pytest.raises(ValueError, match='Privacy check failed in release notes'):
+        release.publish()

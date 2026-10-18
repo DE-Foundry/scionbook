@@ -94,7 +94,10 @@ bumps, release notes, retention, privacy checks, and retries. Follow it for ever
 Branch creation does not establish a release version or authorize publication.
 No character identity, profile/account link, personal information, or player state may enter tracked
 content, commit messages, author metadata, branches, tags, or release assets. Private project branches
-and forks are not exceptions. Use a nonpersonal project identity for published Git authorship.
+and forks are not exceptions. Public GitHub contributor handles and noreply attribution are permitted;
+keep these public identifiers out of private denylists. Use a project identity or GitHub noreply email
+for published Git authorship and enable account email privacy before web merges. See
+[identity guidance](docs/releasing.md#contributor-identity-and-github-web-merges) for historical findings.
 Local runtime state remains ignored; personal backups must be separate from the project repository.
 Every contributor and maintainer must configure an ignored local denylist and install the privacy
 pre-push hook in each checkout before pushing, including personal forks and agent-assisted work.

@@ -16,6 +16,8 @@ import argparse
 import io
 import json
 import os
+import re
+from urllib.parse import unquote
 from pathlib import Path, PurePosixPath
 import subprocess
 import sys
@@ -79,11 +81,15 @@ def personal_paths(names):
 
 def scan(files, terms):
     """Return (path, term) for every file containing a term, including in its path."""
-    needles = sorted({t.lower() for t in terms if len(t) >= MIN_TERM})
+    needles = [(term, re.compile(r"[\W_]*".join(re.escape(word) for word in term.split()), re.I))
+               for term in sorted({t.strip().lower() for t in terms if len(t.strip()) >= MIN_TERM})]
     hits = []
     for path, content in files.items():
-        haystack = path.lower() + "\n" + content.decode("utf-8", "ignore").lower()
-        hits.extend((path, term) for term in needles if term in haystack)
+        raw = path + "\n" + content.decode("utf-8", "ignore")
+        # Percent-encoded spaces contain digits, so decode URLs before separator matching.
+        decoded = unquote(raw)
+        hits.extend((path, term) for term, pattern in needles
+                    if pattern.search(raw) or pattern.search(decoded))
     return hits
 
 

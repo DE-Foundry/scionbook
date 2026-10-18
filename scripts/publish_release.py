@@ -72,9 +72,14 @@ def plan(existing):
     revision = latest + '..HEAD' if latest else 'HEAD'
     messages = git('log', '--no-merges', '--format=%B%x00', revision).split('\x00')
     messages = [msg.strip() for msg in messages if msg.strip()]
-    # Runtime dependency updates must reach users even with chore(deps) titles.
-    if latest and 'requirements.txt' in git('diff', '--name-only', latest, 'HEAD').splitlines():
-        messages.append('fix(deps): update runtime dependencies')
+    # Markdown skills/templates are executable product behavior too. Only explicitly
+    # maintenance-scoped paths may be skipped for a maintenance-only commit range.
+    if latest:
+        changed = [name for name in git('diff', '--no-renames', '--name-only', '-z',
+                                       latest, 'HEAD').split('\0') if name]
+        if any(not (name.startswith(('.github/', 'tests/'))
+                    or name in {'requirements-dev.txt', 'requirements-ci.txt'}) for name in changed):
+            messages.append('fix: update shipped product files')
     return next_version(latest[1:] if latest else None, messages)
 
 
@@ -100,7 +105,13 @@ def release_notes(version):
     appendix = package.source.REPO / 'RELEASE_NOTES.md'
     if 'RELEASE_NOTES.md' in changed and appendix.is_file():
         notes += '\n## Compatibility and migration\n\n' + appendix.read_text(encoding='utf-8')
+    check_notes(notes)
     return notes
+
+
+def check_notes(notes):
+    if package.source.scan({'release notes': notes.encode('utf-8')}, package.source.identifying_terms()):
+        raise ValueError('Privacy check failed in release notes; no publication attempted.')
 
 
 def verify(tag, expected, compare_build=True):
@@ -132,6 +143,8 @@ def publish():
         artifact = Path(directory) / f'scionbook-{version}.zip'
         if not matching or matching['draft']:
             artifact = package.build(version, directory)
+            if matching:
+                check_notes(matching.get('body') or '')
             if not matching:
                 notes = Path(directory) / 'notes.md'
                 notes.write_text(release_notes(version), encoding='utf-8')

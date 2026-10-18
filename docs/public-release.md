@@ -45,7 +45,9 @@ runs do not publish releases. No CI job needs a Lodestone cookie or player files
 3. Wait for all required checks on the current PR revision and resolve conversations. For outside
    contributors, review code/workflow changes before approving execution. Never run untrusted PR code
    with write tokens or secrets through a privileged pull-request-target workflow.
-4. Squash merge. This authorizes the tested-main release workflow, not a manual bypass of checks.
+4. Before merging, confirm the merging account has **Keep my email addresses private** enabled;
+   local hooks cannot check server-created commits. Follow [identity guidance](releasing.md#contributor-identity-and-github-web-merges)
+   for public noreply attribution and unresolved historical exposures. Squash merge. This authorizes the tested-main release workflow, not a manual bypass of checks.
 
 ## After the first release, and after packaging changes
 

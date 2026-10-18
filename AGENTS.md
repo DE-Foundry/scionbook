@@ -66,7 +66,9 @@ Before any authorized push, ensure this checkout has the local denylist and priv
 under docs/releasing.md#privacy-before-push. Keep identifying terms only in ignored local configuration;
 never put them in tracked examples or logs. Do not bypass a blocked push or use dummy terms to satisfy
 the check. Report missing setup or findings for private resolution within the user's authorized scope.
-The GitHub release secret does not replace local setup.
+The GitHub release secret does not replace local setup. Public GitHub contributor handles and noreply
+attribution are permitted and should not be denied. Follow the identity guidance in docs/releasing.md
+for web-merge email privacy; never treat a local hook as protection for server-created commits.
 Report local saves, refreshes, commits, and verified pushes separately.
 
 ## Skills and runtime

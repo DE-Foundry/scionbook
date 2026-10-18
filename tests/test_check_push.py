@@ -70,3 +70,29 @@ def test_annotated_tag_metadata_blocks(source):
 def test_install_sets_local_hook_path(source):
     check_push.install()
     assert git(source, 'config', '--local', '--get', 'core.hooksPath').strip() == '.githooks'
+
+
+@pytest.mark.parametrize('name', ['synthetic-private-identifier', 'SyntheticPrivateIdentifier',
+                                 'synthetic_private_identifier', 'synthetic%20private%20identifier'])
+def test_push_rejects_slugified_reference_names(source, name):
+    with pytest.raises(ValueError, match='reference names'):
+        check_push.check(update(source).replace('refs/heads/main', 'refs/heads/' + name))
+
+
+@pytest.mark.skipif(sys.platform == 'win32', reason='POSIX shell stubs simulate Windows Python aliases')
+@pytest.mark.parametrize('python3_status,expected', [(0, 'python3'), (1, 'python')])
+def test_hook_checks_interpreter_before_selecting_it(tmp_path, python3_status, expected):
+    import os
+    import subprocess
+    for name in ('python3', 'python'):
+        script = tmp_path / name
+        script.write_text(
+            '#!/bin/sh\n'
+            f'if [ "$1" = "-c" ]; then exit {python3_status if name == "python3" else 0}; fi\n'
+            'read -r input\n'
+            f'printf "%s:%s:%s" "{name}" "$1" "$input"\n')
+        script.chmod(0o755)
+    hook = Path(__file__).resolve().parent.parent / '.githooks/pre-push'
+    result = subprocess.run(['/bin/sh', str(hook)], input='synthetic refs\n', text=True,
+                            capture_output=True, check=True, env={**os.environ, 'PATH': str(tmp_path)})
+    assert result.stdout == f'{expected}:scripts/check_push.py:synthetic refs'
