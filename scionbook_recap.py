@@ -8,7 +8,7 @@ import tempfile
 import shutil
 import unicodedata
 
-from scionbook_config import validate_config
+from scionbook_config import parse_json, validate_config
 
 OUTPUTS = ("SCIONBOOK_MEMORY.md", "SCIONBOOK_DAILY_WEEKLY_CHECKLIST.md", "scionbook.json")
 INPUTS = (*OUTPUTS, "status.json", "quest_history.md", "SCIONBOOK_INSTRUCTIONS.md",
@@ -76,25 +76,10 @@ def snapshot(root):
         raise ValueError("Configure this checkout with setup before applying recaps.")
     if not state[SKILL] or not state[SKILL].strip():
         raise ValueError("The apply-recap skill is missing or empty; repair the installation.")
+    if not state["docs/gameplay-preferences.md"] or not state["docs/gameplay-preferences.md"].strip():
+        raise ValueError("The gameplay preferences document is missing or empty; repair the installation.")
     validate_config(parse_json(state["scionbook.json"]))
     return state
-
-
-def parse_json(text):
-    def pairs(items):
-        result = {}
-        for key, value in items:
-            if key in result:
-                raise ValueError("Duplicate JSON key.")
-            result[key] = value
-        return result
-    def constant(_):
-        raise ValueError("Non-finite JSON value.")
-    if isinstance(text, bytes):
-        text = text.decode("utf-8-sig")
-    if isinstance(text, str):
-        text = text.removeprefix("\ufeff")
-    return json.loads(text, object_pairs_hook=pairs, parse_constant=constant)
 
 
 @contextmanager

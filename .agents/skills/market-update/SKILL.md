@@ -5,11 +5,7 @@ description: Review FFXIV retainer listings, current market prices, recent sales
 
 # Market update
 
-Read scionbook.json `preferences.gameplay` and follow
-[gameplay preferences](../../../docs/gameplay-preferences.md). Apply ordered priorities
-and relevant standing routines, including exclusions and job/level conditions. Newer
-explicit conversation choices take precedence; session-only overrides remain temporary.
-Keep durable changes, session choices, and confirmed outcomes separate.
+Load and apply saved preferences using [gameplay preference rules](../../../docs/gameplay-preferences.md).
 
 Follow AGENTS.md and shared source/freshness rules. Analyze in either role without changing permissions.
 Read configured home world/data center, preferences, status.json timestamp/warnings/gaps, market_listings,

@@ -5,11 +5,7 @@ description: Start or resume the read-only Scionbook Session Planner, load the f
 
 # Start session
 
-Read scionbook.json `preferences.gameplay` and follow
-[gameplay preferences](../../../docs/gameplay-preferences.md). Apply ordered priorities
-and relevant standing routines, including exclusions and job/level conditions. Newer
-explicit conversation choices take precedence; session-only overrides remain temporary.
-Keep durable changes, session choices, and confirmed outcomes separate.
+Load and apply saved preferences using [gameplay preference rules](../../../docs/gameplay-preferences.md).
 
 Read root AGENTS.md and standards.md. Establish the Session Planner role in a fresh gameplay chat; if this is an established Maintainer chat, direct the user to a separate session chat instead. Never write files, run sync/scrapers, request write escalation, or communicate with another agent except the user-confirmed recap transport defined in docs/chat-handoffs.md.
 

@@ -50,7 +50,10 @@ authorizes sync, commits, pushes, or a role switch.
 ## Before character setup
 
 If `scionbook.json` is absent, an explicitly authorized Maintainer preference save may
-use ignored `local/gameplay-preferences.json`, containing only a `preferences` object.
+use ignored `local/gameplay-preferences.json`, containing only a `preferences` object
+with an optional `gameplay` object.
+Other preference keys in this seed are rejected; configure those after setup. Duplicate
+JSON keys and non-finite values are rejected in seeds, configuration, and recaps.
 Do not fabricate identity or initialize memory/checklist completion records. First setup
 validates and imports this seed into configuration alongside normal defaults. Reruns
 ignore the seed entirely and preserve configured preferences. Once configuration exists,
@@ -77,8 +80,11 @@ a pre-setup seed; in configuration merge its `preferences` into existing prefere
 
 Configuration stays at version 1: the existing extensible preferences object supports
 these optional fields. No automatic migration of ambiguous legacy prose is performed.
-Older configuration without gameplay fields remains valid. To roll back, preserve the
-ignored local configuration separately and remove only the optional gameplay fields if
+Older configuration without gameplay fields remains valid. Existing malformed gameplay
+fields are rejected: correct them to the documented object/list types before using
+configuration-dependent commands. A setup rerun restores defaults when the entire
+preferences key is absent; existing preference objects are preserved unchanged.
+To roll back, preserve the ignored local configuration separately and remove only the optional gameplay fields if
 needed; older readers can retain them as unknown preferences. Source updates and this
 preference format do not require a character refresh. Templates and synthetic tests
 must never contain a real player's choices.

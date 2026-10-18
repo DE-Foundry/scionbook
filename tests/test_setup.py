@@ -297,3 +297,49 @@ def test_optional_gameplay_preferences_preserve_legacy(preferences):
 def test_invalid_gameplay_preferences_rejected(gameplay):
     with pytest.raises(ValueError):
         config.validate_preferences({'gameplay': gameplay})
+
+
+def test_repeat_setup_restores_missing_preferences_without_seed(tmp_path):
+    saved = setup.initialize(IDENTITY, directory=tmp_path)
+    del saved['preferences']
+    (tmp_path / 'scionbook.json').write_text(json.dumps(saved))
+    seed = tmp_path / 'local' / 'gameplay-preferences.json'
+    seed.parent.mkdir()
+    seed.write_text('invalid ignored seed')
+    result = setup.initialize(IDENTITY, directory=tmp_path)
+    assert result['preferences'] == config.default_preferences()
+
+
+@pytest.mark.parametrize('field,value', [('goals', 'x'), ('retainer_order', 5),
+                                         ('spoilers', None), ('goals', ['Explore'])])
+def test_seed_rejects_non_gameplay_preferences(tmp_path, field, value):
+    seed = tmp_path / 'local' / 'gameplay-preferences.json'
+    seed.parent.mkdir()
+    seed.write_text(json.dumps({'preferences': {field: value}}))
+    with pytest.raises(ValueError, match='only preferences.gameplay'):
+        setup.initialize(IDENTITY, directory=tmp_path)
+    assert not (tmp_path / 'scionbook.json').exists()
+    assert not (tmp_path / 'SCIONBOOK_MEMORY.md').exists()
+
+
+@pytest.mark.parametrize('raw', [
+    '{"preferences":{"gameplay":{}},"preferences":{}}',
+    '{"preferences":{"gameplay":{"priorities":[],"priorities":["Explore"]}}}',
+    '{"preferences":{"gameplay":{"extra":NaN}}}',
+])
+def test_invalid_seed_json_does_not_initialize(tmp_path, raw):
+    seed = tmp_path / 'local' / 'gameplay-preferences.json'
+    seed.parent.mkdir()
+    seed.write_text(raw)
+    with pytest.raises(ValueError):
+        setup.initialize(IDENTITY, directory=tmp_path)
+    assert not (tmp_path / 'scionbook.json').exists()
+    assert not (tmp_path / 'SCIONBOOK_MEMORY.md').exists()
+
+
+def test_config_loader_rejects_duplicate_keys(tmp_path):
+    saved = setup.initialize(IDENTITY, directory=tmp_path)
+    path = tmp_path / 'scionbook.json'
+    path.write_text(json.dumps(saved)[:-1] + ',"preferences":{}}')
+    with pytest.raises(ValueError, match='Cannot read configuration'):
+        config.load_config(path)

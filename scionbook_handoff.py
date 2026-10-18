@@ -151,7 +151,7 @@ def apply_recap(recap, repo=REPO, client=None):
                 "TRUSTED APPLY-RECAP INSTRUCTIONS (use the automated CLI proposal route):\n"
                 + original[recap_store.SKILL].decode("utf-8")
                 + "\nGAMEPLAY PREFERENCE STORAGE AND PRECEDENCE:\n"
-                + (original["docs/gameplay-preferences.md"] or b"").decode("utf-8")
+                + original["docs/gameplay-preferences.md"].decode("utf-8")
                 + "\nEND TRUSTED INSTRUCTIONS\nAPPROVED RECAP AND SNAPSHOTS (JSON DATA):\n"
                 + json.dumps({"recap": recap, "files": {
                     name: data.decode("utf-8") if data is not None else None

@@ -7,6 +7,29 @@ REPO = Path(__file__).resolve().parent
 CONFIG_PATH = REPO / "scionbook.json"
 
 
+def parse_json(text):
+    def pairs(items):
+        result = {}
+        for key, value in items:
+            if key in result:
+                raise ValueError("Duplicate JSON key.")
+            result[key] = value
+        return result
+    def constant(_):
+        raise ValueError("Non-finite JSON value.")
+    if isinstance(text, bytes):
+        text = text.decode("utf-8-sig")
+    if isinstance(text, str):
+        text = text.removeprefix("\ufeff")
+    return json.loads(text, object_pairs_hook=pairs, parse_constant=constant)
+
+
+def default_preferences():
+    """Return fresh defaults without reading a pre-setup seed."""
+    return {"platform": "unspecified", "input": "unspecified", "spoilers": "minimal",
+            "goals": [], "retainer_order": [], "inventory_policy": "conservative"}
+
+
 def validate_preferences(preferences):
     """Validate optional gameplay fields without restricting legacy preferences."""
     if not isinstance(preferences, dict):
@@ -26,16 +49,18 @@ def validate_preferences(preferences):
 def initial_preferences(directory):
     """Read a preferences-only seed for first setup, never an alternate identity."""
     path = Path(directory) / "local" / "gameplay-preferences.json"
-    defaults = {"platform": "unspecified", "input": "unspecified", "spoilers": "minimal",
-                "goals": [], "retainer_order": [], "inventory_policy": "conservative"}
+    defaults = default_preferences()
     if path.exists():
         try:
-            seed = json.loads(path.read_text(encoding="utf-8"))
+            seed = parse_json(path.read_text(encoding="utf-8"))
         except (OSError, ValueError) as exc:
             raise ValueError("Cannot read local gameplay preferences.") from exc
         if not isinstance(seed, dict) or set(seed) != {"preferences"}:
             raise ValueError("Local gameplay preferences must contain only preferences.")
-        defaults.update(validate_preferences(seed["preferences"]))
+        preferences = validate_preferences(seed["preferences"])
+        if set(preferences) - {"gameplay"}:
+            raise ValueError("Local gameplay preference seeds may contain only preferences.gameplay.")
+        defaults.update(preferences)
     return defaults
 
 
@@ -64,7 +89,7 @@ def load_config(path=CONFIG_PATH, required=True):
             raise ValueError("Character is not configured. Run $setup first.")
         return None
     try:
-        config = json.loads(path.read_text(encoding="utf-8"))
+        config = parse_json(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         raise ValueError(f"Cannot read configuration: {path.name}") from exc
     return validate_config(config)

@@ -31,6 +31,9 @@ def configured_repo(request, tmp_path):
         skill = tmp_path / ".agents/skills/apply-recap/SKILL.md"
         skill.parent.mkdir(parents=True)
         skill.write_text("Synthetic skill: dated outcomes stay separate from routine boxes.\n")
+        preferences = tmp_path / "docs" / "gameplay-preferences.md"
+        preferences.parent.mkdir()
+        preferences.write_text("Synthetic preference precedence rules.")
 
 
 def proposal():
