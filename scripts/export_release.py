@@ -15,6 +15,9 @@ Terms are matched case-insensitively. Nothing is pushed.
 import argparse
 import io
 import json
+import os
+import re
+from urllib.parse import unquote
 from pathlib import Path, PurePosixPath
 import subprocess
 import sys
@@ -60,6 +63,13 @@ def read_terms(path):
     return {line.strip() for line in lines if line.strip() and not line.lstrip().startswith("#")}
 
 
+def identifying_terms():
+    terms = local_terms() | read_terms(REPO / DEFAULT_DENYLIST)
+    terms |= {line.strip() for line in os.environ.get('SCIONBOOK_RELEASE_DENYLIST', '').splitlines()
+              if line.strip() and not line.lstrip().startswith('#')}
+    return {term for term in terms if len(term) >= MIN_TERM}
+
+
 def personal_paths(names):
     return sorted(n for n in names if n not in ALLOWED_TEMPLATES
                   and (any(PurePosixPath(n).name.startswith(p) for p in PERSONAL_NAMES)
@@ -71,11 +81,15 @@ def personal_paths(names):
 
 def scan(files, terms):
     """Return (path, term) for every file containing a term, including in its path."""
-    needles = sorted({t.lower() for t in terms if len(t) >= MIN_TERM})
+    needles = [(term, re.compile(r"[\W_]*".join(re.escape(word) for word in term.split()), re.I))
+               for term in sorted({t.strip().lower() for t in terms if len(t.strip()) >= MIN_TERM})]
     hits = []
     for path, content in files.items():
-        haystack = path.lower() + "\n" + content.decode("utf-8", "ignore").lower()
-        hits.extend((path, term) for term in needles if term in haystack)
+        raw = path + "\n" + content.decode("utf-8", "ignore")
+        # Percent-encoded spaces contain digits, so decode URLs before separator matching.
+        decoded = unquote(raw)
+        hits.extend((path, term) for term, pattern in needles
+                    if pattern.search(raw) or pattern.search(decoded))
     return hits
 
 

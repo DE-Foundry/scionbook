@@ -13,7 +13,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import scionbook_handoff as handoff
 
 
-@pytest.mark.parametrize("recap", ["", "   ", "x" * (handoff.MAX_RECAP + 1)])
+@pytest.mark.parametrize("recap", ["", "   ", "x" * (handoff.MAX_RECAP + 1)],
+                         ids=["empty", "blank", "too-long"])
 def test_invalid_recap_never_starts_an_agent_or_creates_staging(tmp_path, monkeypatch, recap):
     monkeypatch.setattr(handoff.subprocess, "run", lambda *a, **k: pytest.fail("agent started"))
     with pytest.raises(ValueError):
@@ -157,6 +158,7 @@ def test_launch_failure_is_reported(monkeypatch):
     ("session", "read-only", "never", "$start-session"),
     ("maintainer", "workspace-write", "on-request", "$start-maintenance"),
 ])
+@pytest.mark.skipif(os.name == "nt", reason="Bash adapters are supported on Linux/macOS")
 def test_actual_launcher_uses_new_context_and_role_permissions(tmp_path, role, sandbox, approval, skill):
     # Execute the real Bash launcher with a fake codex executable; no live agent.
     executable = tmp_path / "codex"
@@ -182,6 +184,7 @@ def fake_claude(tmp_path):
             "SCIONBOOK_CLIENT": "claude"}
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Bash adapters are supported on Linux/macOS")
 def test_claude_session_launcher_is_read_only(tmp_path):
     result = subprocess.run(["bash", str(handoff.REPO / "scripts" / "scionbook-chat"), "session"],
                             env=fake_claude(tmp_path), text=True, capture_output=True, check=True)
@@ -196,6 +199,7 @@ def test_claude_session_launcher_is_read_only(tmp_path):
     assert not any(value in args for value in ("--resume", "--continue", "-c", "-r"))
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Bash adapters are supported on Linux/macOS")
 def test_claude_maintainer_launcher_keeps_write_prompts(tmp_path):
     result = subprocess.run(["bash", str(handoff.REPO / "scripts" / "scionbook-chat"), "maintainer"],
                             env=fake_claude(tmp_path), text=True, capture_output=True, check=True)
@@ -207,6 +211,7 @@ def test_claude_maintainer_launcher_keeps_write_prompts(tmp_path):
     assert "start-maintenance" in args[-1]
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Bash adapters are supported on Linux/macOS")
 def test_unknown_client_is_rejected(tmp_path):
     environment = {**os.environ, "SCIONBOOK_CLIENT": "other"}
     result = subprocess.run(["bash", str(handoff.REPO / "scripts" / "scionbook-chat"), "session"],
@@ -258,9 +263,13 @@ def test_start_chat_passes_client_to_launcher(monkeypatch):
 
 
 @pytest.mark.parametrize('role,skill', [('session', 'start-session'), ('maintainer', 'start-maintenance'), ('apply', 'apply-recap')])
-def test_app_draft_encodes_exact_workspace_and_skill_without_launch(tmp_path, monkeypatch, role, skill):
+@pytest.mark.parametrize('dirname', [
+    'A repo & # ü',
+    pytest.param('A repo & #? ü', marks=pytest.mark.skipif(sys.platform == 'win32', reason='Windows forbids ? in filenames')),
+])
+def test_app_draft_encodes_exact_workspace_and_skill_without_launch(tmp_path, monkeypatch, role, skill, dirname):
     from urllib.parse import urlsplit, parse_qs
-    repo = tmp_path / 'A repo & #? ü'
+    repo = tmp_path / dirname
     repo.mkdir()
     monkeypatch.setattr(handoff.subprocess, 'run', lambda *a, **k: pytest.fail('launched agent'))
     url = urlsplit(handoff.app_draft_link(role, repo))

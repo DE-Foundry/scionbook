@@ -11,6 +11,12 @@ If you have upstream write access, clone upstream. Otherwise, fork the project a
 `origin` to the fork and add `upstream` pointing to the original repository as in the
 [installation guide](docs/installation.md#personal-fork). Never put character data on development branches.
 
+Before your first push from **each clone**, complete [privacy setup](docs/releasing.md#privacy-before-push):
+create your ignored `.scionbook-release-denylist`, populate it with your private identifying terms, and
+install the pre-push hook. This is required for every contributor and maintainer, including agent-assisted
+work and personal forks. Keep real identifiers out of PRs, examples, and shared configuration. A GitHub
+release secret does not replace this local setup.
+
 Start a focused branch from the current upstream default branch. The commands below assume `upstream`
 points to the original repository; use `origin` instead when you cloned upstream directly:
 
@@ -63,7 +69,28 @@ Examples: `feat(setup): add public-mode setup`, `fix(report): preserve unavailab
 a `BREAKING CHANGE:` footer. See standards.md and docs/releasing.md for SemVer and the compatibility
 contract. Do not rewrite existing history simply to retrofit commit style.
 
+Follow [release policy](docs/releasing.md) for version selection, release notes, and retries.
+Add compatibility/migration guidance to RELEASE_NOTES.md when a change requires it.
+
 Never include real character names/IDs, character profile links, account links, personal information,
 credentials, player reports, or preferences in contributions, branches, tags, releases, commit messages,
-or author metadata. Use synthetic fixtures and a nonpersonal project Git identity. Private branches
+or author metadata. Public GitHub contributor handles and their noreply addresses are permitted
+attribution; keep them out of private denylists. Use synthetic fixtures and a nonpersonal project Git identity. Private branches
 are not a data-storage exception; ignored runtime files must never be force-added.
+
+
+## Public CI and merge requirements
+
+Public contributions are welcome. Maintainers must approve workflow execution for outside contributors
+before CI runs. Never provide player credentials to CI. Required checks include the Python matrix,
+workflow/dependency checks, package smoke tests, and a Conventional Commit PR title. Keep the branch
+up to date and resolve review conversations before merging. Squash merge uses the PR title and body;
+put a breaking marker in the title and explain compatibility/migration in the body and RELEASE_NOTES.md.
+
+GitHub currently has one maintainer, so PRs and passing checks are required without a second-reviewer
+minimum. Revisit that minimum when another maintainer joins. CodeQL runs through GitHub default setup.
+Actions are pinned to full commit SHAs; Dependabot updates Python and Actions weekly. Dependabot's
+own generated branch names are an exception to the human branch naming convention.
+Before web merges, enable GitHub email privacy as described in
+[contributor identity guidance](docs/releasing.md#contributor-identity-and-github-web-merges).
+See [public-release controls and verification](docs/public-release.md).

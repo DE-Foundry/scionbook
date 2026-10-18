@@ -33,3 +33,6 @@ raw/
 
 # Synthetic test fixtures must remain trackable, including snapshot filenames.
 !tests/fixtures/**
+
+# Private release-scanning identifiers, including backup copies; never fixtures.
+.scionbook-release-denylist*

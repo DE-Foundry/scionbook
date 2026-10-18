@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import io
+import os
 from pathlib import Path
 import re
 import tarfile
@@ -21,17 +22,21 @@ def version_key(value):
     return tuple(map(int, value.split('.')))
 
 
-def build(version, output, deny=()):
+def build(version, output, deny=(), *, require_terms=None):
     key = version_key(version)
     repo = source.REPO
     if source.git('status', '--porcelain', '--untracked-files=no').stdout.strip():
         raise ValueError('Commit tracked changes first; releases use HEAD only.')
     archive, files = source.committed_files()
-    terms = source.local_terms() | source.read_terms(repo / source.DEFAULT_DENYLIST)
+    terms = source.identifying_terms()
     for path in deny:
         if not Path(path).is_file():
             raise ValueError('Requested denylist does not exist.')
         terms |= source.read_terms(path)
+    if require_terms is None:
+        require_terms = os.environ.get('CI', '').lower() in ('true', '1')
+    if require_terms and not any(len(term) >= source.MIN_TERM for term in terms):
+        raise ValueError('Privacy denylist is empty; configure SCIONBOOK_RELEASE_DENYLIST before publication.')
     if source.personal_paths(files) or source.scan(files, terms):
         raise ValueError('Privacy check failed; no archive written. Review tracked files locally.')
     output = Path(output)

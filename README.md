@@ -358,15 +358,10 @@ or quest history. Setup tests cover exact matches, ambiguous/missing profiles, c
 and prevention of cross-character overwrites. External services: Lodestone, Universalis, the Teamcraft item
 name database, and XIVAPI for optional recipe/vendor data. No credentials are needed for the test suite.
 
-[GitHub Actions](.github/workflows/tests.yml) runs the suite on pushes, pull requests, and manual dispatch:
-Python 3.10 and 3.14 on Ubuntu, plus Python 3.14 on macOS. The workflow installs `requirements-dev.txt`
-and runs `python -m pytest tests/ -q` with read-only repository permissions and no account secrets.
-These are offline fixture tests, not live Lodestone compatibility checks. Windows CI is not yet included;
-the optional Bash launchers (Codex and Claude Code, using stub executables) are tested on Linux and macOS.
-
-Releases are versioned ZIP archives with checksums; keep the current version plus three previous
-versions. Build and review them using [releasing](docs/releasing.md). A fresh-history export is optional for
-checkouts whose history should not be published.
+[GitHub Actions](.github/workflows/tests.yml) tests Python 3.10/3.14 across Linux, macOS, and Windows,
+lints workflows, audits runtime dependencies, and smoke-tests extracted ZIPs. PR titles are checked
+separately. Bash adapter tests run on Linux/macOS. These are offline checks, not live service certification.
+See [public CI controls](docs/public-release.md) and [release policy and retries](docs/releasing.md).
 
 ## Contributing and public releases
 

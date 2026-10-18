@@ -88,21 +88,21 @@ Use `<type>/<kebab-case-summary>` for branches and Conventional Commits
 `<type>[optional scope]: <summary>` for commit messages and pull request titles.
 Use `feat` for new functionality and `fix` for corrections; use `docs`, `test`,
 `refactor`, `chore`, or `ci` for changes of those kinds.
-Release versions follow Semantic Versioning: backward-compatible features warrant a minor
-increment, fixes warrant a patch increment, and incompatible public API changes warrant a
-major increment. Mark breaking changes with `!` and a `BREAKING CHANGE:` explanation.
-An internal cache migration that preserves existing workflows is not by itself a public API break.
-Branch creation does not establish a release version; create version tags only for an explicitly
-authorized release against the established version baseline.
-
-
-Releases are reviewed source ZIPs built with `scripts/build_release.py`, with SHA-256 checksums.
-Retain the current version and three previous versions (four total); retain source tags for provenance.
-See docs/releasing.md for the compatibility contract, build procedure, and hosted cleanup.
+Mark breaking changes with `!` and a `BREAKING CHANGE:` explanation.
+The authoritative [release policy](docs/releasing.md) defines SemVer, packaging, compatibility, version
+bumps, release notes, retention, privacy checks, and retries. Follow it for every publication.
+Branch creation does not establish a release version or authorize publication.
 No character identity, profile/account link, personal information, or player state may enter tracked
 content, commit messages, author metadata, branches, tags, or release assets. Private project branches
-and forks are not exceptions. Use a nonpersonal project identity for published Git authorship.
+and forks are not exceptions. Public GitHub contributor handles and noreply attribution are permitted;
+keep these public identifiers out of private denylists. Use a project identity or GitHub noreply email
+for published Git authorship and enable account email privacy before web merges. See
+[identity guidance](docs/releasing.md#contributor-identity-and-github-web-merges) for historical findings.
 Local runtime state remains ignored; personal backups must be separate from the project repository.
+Every contributor and maintainer must configure an ignored local denylist and install the privacy
+pre-push hook in each checkout before pushing, including personal forks and agent-assisted work.
+Follow [privacy setup](docs/releasing.md#privacy-before-push); never bypass a failed scan or commit its
+identifying terms. The release-job secret supplements local protection and does not replace it.
 
 
 ## Installation and updates
@@ -113,3 +113,12 @@ clone a fork. Document both user methods in docs/installation.md; do not require
 Use one local directory per character, never character branches. Personal state remains ignored in all
 methods, including private forks. Application updates preserve local state; any saved-format changes
 need documented migration and rollback guidance. Updating source never implies setup or a refresh.
+
+
+## Public repository delivery
+
+Follow docs/public-release.md for the approved public-release procedure. Main requires PRs, current
+passing checks, and resolved conversations; force pushes and deletion are disabled. Squash PR titles
+must be Conventional Commits. Keep workflow tokens read-only except the tested-main release job.
+Pin Actions to full SHAs, review dependency updates, and require approval for outside contributors'
+workflows. Never expose player credentials to CI. Public forks do not publish automatically.

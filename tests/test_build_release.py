@@ -11,6 +11,13 @@ import build_release as release
 from test_export_release import source, git
 
 
+@pytest.fixture(autouse=True)
+def isolated_ci(monkeypatch):
+    monkeypatch.delenv('CI', raising=False)
+    monkeypatch.delenv('SCIONBOOK_RELEASE_DENYLIST', raising=False)
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Synthetic symlink fixture needs POSIX; ZIP smoke covers Windows extraction")
 def test_zip_is_complete_and_materializes_adapter(source, tmp_path):
     (source / '.agents/skills/example').mkdir(parents=True)
     (source / '.agents/skills/example/SKILL.md').write_text('Synthetic instructions')
@@ -72,3 +79,15 @@ def test_content_denylist_and_dirty_tree_block_package(source, tmp_path):
     (source / 'README.md').write_text('changed')
     with pytest.raises(ValueError, match='Commit'):
         release.build('1.0.0', tmp_path / 'packages')
+
+
+def test_ci_requires_effective_terms(source, tmp_path, monkeypatch):
+    monkeypatch.setenv('CI', 'true')
+    monkeypatch.setenv('SCIONBOOK_RELEASE_DENYLIST', '# comment\nabc')
+    with pytest.raises(ValueError, match='denylist is empty'):
+        release.build('1.0.0', tmp_path / 'packages')
+    monkeypatch.setenv('SCIONBOOK_RELEASE_DENYLIST', 'Second revision')
+    with pytest.raises(ValueError, match='Privacy check failed'):
+        release.build('1.0.0', tmp_path / 'packages')
+    monkeypatch.setenv('SCIONBOOK_RELEASE_DENYLIST', 'Synthetic blocked identifier')
+    assert release.build('1.0.0', tmp_path / 'packages').is_file()

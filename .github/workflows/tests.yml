@@ -3,7 +3,10 @@ name: Tests
 on:
   push:
   pull_request:
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
+  schedule:
+    - cron: '17 8 * * 1'
 
 permissions:
   contents: read
@@ -22,11 +25,15 @@ jobs:
             python: '3.14'
           - os: macos-latest
             python: '3.14'
+          - os: windows-latest
+            python: '3.14'
     steps:
-      - uses: actions/checkout@v6
+      - name: Keep source line endings consistent
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: ${{ matrix.python }}
           cache: pip
@@ -36,4 +43,90 @@ jobs:
       - name: Install test dependencies
         run: python -m pip install -r requirements-dev.txt
       - name: Run offline tests
-        run: python -m pytest tests/ -q
+        run: python -m pytest tests/ -q --tb=short --durations=10
+
+  release:
+    needs: [pytest, quality, package]
+    if: >-
+      github.event.repository.fork == false &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    concurrency:
+      group: scionbook-release
+      cancel-in-progress: false
+    steps:
+      - name: Keep source line endings consistent
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.sha }}
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.14'
+      - name: Publish verified release and enforce retention
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SCIONBOOK_RELEASE_DENYLIST: ${{ secrets.SCIONBOOK_RELEASE_DENYLIST }}
+        run: python scripts/publish_release.py
+
+
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.14'
+      - name: Lint Actions workflows
+        env:
+          GOBIN: ${{ runner.temp }}/actionlint-bin
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          "$GOBIN/actionlint"
+      - name: Audit shipped runtime dependencies
+        run: |
+          python -m pip install -r requirements-ci.txt
+          python -m pip_audit -r requirements.txt --progress-spinner off
+
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - name: Keep source line endings consistent
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.14'
+      - name: Install and exercise extracted release ZIP
+        run: python scripts/smoke_release.py
+
+  development-audit:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.14'
+      - run: |
+          python -m pip install -r requirements-ci.txt
+          python -m pip_audit -r requirements-ci.txt --progress-spinner off

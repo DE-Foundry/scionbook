@@ -70,6 +70,11 @@ creating a fork does not copy your character data to the hosting service. Review
 and any staged diff before every commit or push. Keep arbitrary personal exports under ignored `local/`.
 Never change the ignore rules to publish player state. You can use an agent for these steps.
 
+Before pushing any branch to your fork, complete [local privacy setup](releasing.md#privacy-before-push).
+Each checkout needs its own ignored denylist and installed hook; include your character and other private
+identifiers locally. Forking or cloning does not install hooks or copy private configuration. A GitHub
+release secret is not needed merely to use a personal fork, and cannot protect local pushes.
+
 ### Update a fork installation
 
 1. Finish saves/refreshes, read upstream release or change notes, and back up local player files outside
