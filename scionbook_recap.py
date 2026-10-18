@@ -20,14 +20,18 @@ MAX_FILE = 2_000_000
 def hidden_controls(text):
     return any(unicodedata.category(char) in {"Cf", "Cc"} and char not in "\n\r\t" for char in text)
 
-def hidden_json_controls(value):
-    if isinstance(value, str):
-        return hidden_controls(value)
-    if isinstance(value, dict):
-        return any(hidden_controls(key) or hidden_json_controls(item) for key, item in value.items())
-    if isinstance(value, list):
-        return any(hidden_json_controls(item) for item in value)
-    return False
+def check_new_controls(text, previous, name):
+    allowed = {char for char in previous if hidden_controls(char)}
+    for line, content in enumerate(text.split("\n"), 1):
+        for char in content:
+            if hidden_controls(char) and char not in allowed:
+                raise ValueError(f"New hidden character U+{ord(char):04X} in {name}, line {line}; nothing was saved.")
+
+
+def json_control_text(value):
+    # Decode escaped JSON strings without losing source line positions.
+    import re
+    return re.sub(r'"(?:[^"\\]|\\.)*"', lambda match: json.loads(match.group()).replace("\n", " "), value)
 
 
 SCHEMA = {
@@ -85,6 +89,10 @@ def parse_json(text):
         return result
     def constant(_):
         raise ValueError("Non-finite JSON value.")
+    if isinstance(text, bytes):
+        text = text.decode("utf-8-sig")
+    if isinstance(text, str):
+        text = text.removeprefix("\ufeff")
     return json.loads(text, object_pairs_hook=pairs, parse_constant=constant)
 
 
@@ -114,16 +122,20 @@ def validate(proposal, original):
         if (not isinstance(item, dict) or set(item) != {"path", "content"}
                 or not isinstance(item["path"], str) or item["path"] not in OUTPUTS
                 or item["path"] in changes or not isinstance(item["content"], str)
-                or not item["content"].strip() or hidden_controls(item["content"])):
+                or not item["content"].strip()):
             raise ValueError("Invalid recap output; nothing was saved.")
-        name, data = item["path"], item["content"].encode("utf-8")
+        name = item["path"]
+        content = item["content"].removeprefix("\ufeff")
+        previous = (original[name] or b"").decode("utf-8-sig")
+        if name != "scionbook.json":
+            check_new_controls(content, previous, name)
+        data = content.encode("utf-8")
         if len(data) > MAX_FILE:
             raise ValueError("Recap output exceeds the size limit.")
         if name == "scionbook.json":
             before, after = parse_json(original[name]), parse_json(data)
             validate_config(after)
-            if hidden_json_controls(after):
-                raise ValueError("Hidden control characters are not allowed in preferences.")
+            check_new_controls(json_control_text(content), json_control_text(previous), name)
             if ({k: v for k, v in before.items() if k != "preferences"}
                     != {k: v for k, v in after.items() if k != "preferences"}):
                 raise ValueError("Recaps may change preferences only, never character configuration.")

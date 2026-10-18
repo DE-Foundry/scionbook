@@ -33,7 +33,7 @@ def agent(monkeypatch, result, effect=None):
             effect(command, kwargs)
         Path(command[command.index("--output-last-message") + 1]).write_text(json.dumps(result))
         return SimpleNamespace(returncode=0)
-    monkeypatch.setattr(handoff.subprocess, "run", run)
+    monkeypatch.setattr(handoff, "run_proposal", run)
 
 
 @pytest.mark.parametrize("path", ["../outside", "/tmp/outside", "AGENTS.md", "status.json",
@@ -260,7 +260,7 @@ def test_skill_is_separate_from_data_and_timeout_releases_lock(repo, monkeypatch
         assert 'Injected recap instruction' in data
         assert kwargs['timeout'] == 600
         raise handoff.subprocess.TimeoutExpired(command, kwargs['timeout'])
-    monkeypatch.setattr(handoff.subprocess, 'run', timeout)
+    monkeypatch.setattr(handoff, 'run_proposal', timeout)
     with pytest.raises(RuntimeError, match='timed out'):
         handoff.apply_recap('Injected recap instruction', repo, client=client)
     assert store.snapshot(repo) == before
@@ -290,3 +290,64 @@ def test_failed_rollback_retains_journal_and_blocks_retry(repo, monkeypatch):
     with pytest.raises(RuntimeError, match='journal'):
         with store.locked(repo):
             pytest.fail('entered failed transaction')
+
+
+@pytest.mark.parametrize('char', ['\u200d', '\u00ad', '\u202e', '\U000e0041'])
+def test_existing_hidden_characters_are_preserved_but_new_ones_explained(repo, char):
+    memory = repo / 'SCIONBOOK_MEMORY.md'
+    memory.write_bytes(('# Existing ' + char + '\n').encode())
+    before = store.snapshot(repo)
+    update = '# Existing ' + char + '\nNew dated report\n'
+    store.install(repo, before, proposal(content=update))
+    assert memory.read_bytes().decode() == update
+    with pytest.raises(ValueError, match=r'U\+200B.*line 3'):
+        store.validate(proposal(content=update + '\u200b'), store.snapshot(repo))
+
+
+def test_bom_is_stripped_and_existing_emoji_survives(repo):
+    memory = repo / 'SCIONBOOK_MEMORY.md'
+    memory.write_bytes('\ufeff# Chef \U0001f9d1\u200d\U0001f373\n'.encode())
+    update = '\ufeff# Chef \U0001f9d1\u200d\U0001f373\nDated report\n'
+    store.install(repo, store.snapshot(repo), proposal(content=update))
+    assert memory.read_bytes().decode() == update.removeprefix('\ufeff')
+
+
+def test_existing_escaped_json_controls_and_bom_are_supported(repo):
+    path = repo / 'scionbook.json'
+    config = json.loads(path.read_text())
+    config['preferences']['focus'] = 'Chef \U0001f9d1\u200d\U0001f373'
+    path.write_bytes(('\ufeff' + json.dumps(config)).encode())
+    config['preferences']['other'] = 'New preference'
+    store.install(repo, store.snapshot(repo), proposal('scionbook.json', '\ufeff' + json.dumps(config, ensure_ascii=False)))
+    assert json.loads(path.read_bytes()) == config
+    assert not path.read_bytes().startswith(b'\xef\xbb\xbf')
+    config['preferences']['other'] = '\u200b'
+    with pytest.raises(ValueError, match=r'U\+200B.*line 1'):
+        store.validate(proposal('scionbook.json', json.dumps(config)), store.snapshot(repo))
+
+
+def test_timeout_stops_real_wrapper_and_child(tmp_path):
+    import subprocess
+    import sys
+    import time
+    heartbeat = tmp_path / 'heartbeat'
+    child = "import time; from pathlib import Path; p=Path(" + repr(str(heartbeat)) + "); "
+    child += "\nwhile True:\n with p.open('ab') as f: f.write(b'x')\n time.sleep(.03)\n"
+    wrapper = 'import subprocess,sys,time; subprocess.Popen([sys.executable,"-c",' + repr(child) + ']); time.sleep(60)'
+    with pytest.raises(subprocess.TimeoutExpired):
+        handoff.run_proposal([sys.executable, '-c', wrapper], input='', timeout=3,
+                             text=True, encoding='utf-8', stdout=subprocess.PIPE)
+    assert heartbeat.exists(), 'Synthetic child did not start before timeout'
+    size = heartbeat.stat().st_size
+    time.sleep(.15)
+    assert heartbeat.stat().st_size == size
+
+
+def test_client_stderr_is_captured_and_not_echoed(capsys):
+    import subprocess
+    import sys
+    result = handoff.run_proposal([sys.executable, '-c', "import sys; print('synthetic private payload', file=sys.stderr); sys.exit(1)"],
+                                 input='', timeout=10, text=True, encoding='utf-8', stdout=subprocess.PIPE)
+    assert 'synthetic private payload' in result.stderr
+    assert 'synthetic private payload' not in handoff.failure_detail(result.stderr)
+    assert capsys.readouterr().err == ''

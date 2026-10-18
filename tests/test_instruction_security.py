@@ -108,3 +108,25 @@ def test_tree_includes_nontraditional_instruction_names(tmp_path):
     git('add', '.')
     git('commit', '-qm', 'test: synthetic instruction')
     assert check.scan(check.tree(tmp_path, git('rev-parse', 'HEAD')))[0][0] == 'error'
+
+
+def test_large_skipped_binary_does_not_consume_text_limits(tmp_path, monkeypatch):
+    def git(*args):
+        return subprocess.check_output(['git', '-C', str(tmp_path), *args]).decode().strip()
+    git('init', '-q')
+    git('config', 'user.name', 'Synthetic Contributor')
+    git('config', 'user.email', 'synthetic@example.invalid')
+    # Invalid UTF-8 appears late: must classify the whole blob, without buffering it all.
+    (tmp_path / 'image.png').write_bytes(b'x' * 200_000 + b'\xff')
+    (tmp_path / 'prompt.txt').write_bytes(b'Ordinary prompt')
+    git('add', '.')
+    git('commit', '-qm', 'test: large synthetic binary')
+    monkeypatch.setattr(check, 'MAX_FILE', 100)
+    monkeypatch.setattr(check, 'MAX_TREE', 100)
+    files = check.tree(tmp_path, git('rev-parse', 'HEAD'))
+    assert set(files) == {'prompt.txt'}
+    (tmp_path / 'prompt.txt').write_bytes(b'x' * 101)
+    git('add', '.')
+    git('commit', '-qm', 'test: oversized text')
+    with pytest.raises(ValueError, match='UTF-8 file exceeds 100.*prompt.txt'):
+        check.tree(tmp_path, git('rev-parse', 'HEAD'))

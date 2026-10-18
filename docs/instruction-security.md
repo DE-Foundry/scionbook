@@ -13,7 +13,9 @@ and recap adapters; binary files outside those instruction paths are skipped. Al
 is included so referenced local documentation is covered; remote link contents are not fetched.
 
 The check fails on hidden/bidirectional controls, invalid UTF-8, unsupported linked instruction paths,
-and size limits (2 MB per file, 20 MB combined). Ordinary visible Unicode is allowed. The exact shipped
+and size limits (2 MB per scanned text file, 20 MB scanned text combined). Binary blobs outside
+instruction paths are classified incrementally and do not count toward these limits; oversized text
+errors identify the file and applicable limit. Ordinary visible Unicode is allowed. The exact shipped
 `.claude/skills` alias is allowed only with its target skills present and independently scanned.
 New external URLs, executable inputs, suspicious execution/permission phrases, and changes to the
 checker, its tests, workflows, or recap adapters produce **review findings**, not a safety verdict.
@@ -61,10 +63,15 @@ It does not decide which paths Python can write. The deterministic installer per
 - `scionbook.json`, with every field other than `preferences` preserved.
 
 Unexpected fields, duplicate destinations, arbitrary paths, empty/oversized content, duplicate JSON keys,
-non-finite JSON values, hidden control characters (including escaped JSON preference values), linked inputs, character configuration changes, and model claims of `applied`
+non-finite JSON values, newly introduced hidden control characters (including decoded JSON preference
+keys/values), linked inputs, character configuration changes, and model claims of `applied`
 are rejected. All proposed files are validated before installation. Snapshots are compared again before
 writing; ordinary concurrent edits stop the save. File replacements are atomic individually and actual
 saved bytes are re-read before the launcher reports success. An identical proposal makes no writes.
+Existing hidden code points in the same original file are allowed so ZWJ emoji and pasted soft hyphens
+do not prevent updates. A leading UTF-8 BOM is stripped from proposed files. New hidden characters name
+the code point and source line in the error without echoing private text. This compatibility allowance
+does not establish that existing hidden content is safe.
 The launcher produces its own receipt; model text cannot claim that a save succeeded or authorize a
 follow-up. Missing/ambiguous proposals stop for manual resolution.
 
@@ -80,8 +87,13 @@ Codex proposals request read-only/never, ephemeral execution, no user config or 
 shell tools and web search, and disabled memory/subagents. Claude proposals expose no built-in tools,
 load an empty strict MCP configuration, disable skills, hooks and browser integration, and omit user and
 project settings. Both receive their inputs in the prompt rather than browsing live player files.
-Proposal runs time out after ten minutes, release the lock, and stop without installing files or starting
-the follow-up. An unsupported CLI flag fails the handoff; never remove restrictions to make an older client work.
+Proposal runs time out after ten minutes. The adapter creates a new process session on Linux/macOS
+and kills its process group on timeout or interruption. On Windows it creates a new process group and
+uses `taskkill /T /F` against the wrapper PID to terminate its tree. Cleanup precedes releasing the lock;
+no proposal is installed and no follow-up starts. These controls do not contain deliberately detached
+processes from a malicious client. Client stderr is captured, never streamed to the terminal. Failure
+messages report only fixed network/authentication categories or a generic diagnostic; even a raw stderr
+tail could expose player data. An unsupported CLI flag fails the handoff; never remove restrictions to make an older client work.
 The installed clients' `--help` and official references were checked during implementation; offline tests
 verify construction and validation, not live model behavior on every client version/platform.
 

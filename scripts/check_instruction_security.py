@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Read Git objects as data; report instruction hazards without executing candidate code."""
 import argparse
+import codecs
 import json
 import os
 import html
@@ -31,6 +32,31 @@ def git(repo, *args):
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE).stdout
 
 
+def read_blob(repo, oid, name):
+    """Classify UTF-8 incrementally; skipped binaries consume no scan-size budget."""
+    decoder = codecs.getincrementaldecoder("utf-8")()
+    chunks, size = [], 0
+    with subprocess.Popen(["git", "-C", str(repo), "cat-file", "blob", oid],
+                          stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as process:
+        try:
+            while chunk := process.stdout.read(65536):
+                decoder.decode(chunk)
+                size += len(chunk)
+                if size <= MAX_FILE:
+                    chunks.append(chunk)
+            decoder.decode(b"", final=True)
+        except UnicodeDecodeError:
+            process.kill()
+            process.wait()
+            # Preserve the invalid-text finding for instruction/configuration paths.
+            return b"\xff" if relevant(name) else None
+        if process.wait():
+            raise ValueError("Could not read a Git blob.")
+    if size > MAX_FILE:
+        raise ValueError(f"UTF-8 file exceeds {MAX_FILE} scan bytes: {json.dumps(name, ensure_ascii=True)}")
+    return b"".join(chunks)
+
+
 def tree(repo, revision):
     if not re.fullmatch(r"[0-9a-f]{40,64}", revision):
         raise ValueError("Expected a full commit object ID.")
@@ -43,11 +69,13 @@ def tree(repo, revision):
         if kind != "blob":
             files[name] = (mode, b"")
             continue
-        size = int(git(repo, "cat-file", "-s", oid))
-        total += size
-        if size > MAX_FILE or total > MAX_TREE:
-            raise ValueError("Instruction scan size limit exceeded.")
-        files[name] = (mode, git(repo, "cat-file", "blob", oid))
+        raw = read_blob(repo, oid, name)
+        if raw is None:
+            continue
+        total += len(raw)
+        if total > MAX_TREE:
+            raise ValueError(f"Scanned text exceeds {MAX_TREE} total bytes at {json.dumps(name, ensure_ascii=True)}")
+        files[name] = (mode, raw)
     return files
 
 
@@ -111,8 +139,10 @@ def main():
     args = parser.parse_args()
     try:
         findings = scan(tree(args.repo, args.head), tree(args.repo, args.base) if args.base else None)
-    except (ValueError, subprocess.CalledProcessError) as exc:
-        raise SystemExit("Instruction scan could not complete; review inputs and limits.") from exc
+    except ValueError as exc:
+        raise SystemExit(f"Instruction scan could not complete: {exc}") from exc
+    except subprocess.CalledProcessError as exc:
+        raise SystemExit("Instruction scan could not read Git objects.") from exc
     # ASCII JSON avoids control/annotation injection from candidate filenames or content.
     print(json.dumps([{"severity": level, "path": name, "reason": reason}
                       for level, name, reason in findings], ensure_ascii=True, indent=2))

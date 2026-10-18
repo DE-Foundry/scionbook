@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -38,6 +39,45 @@ def proposal_environment(client):
     if client == "claude":
         environment["CLAUDE_CODE_DISABLE_AUTO_MEMORY"] = "1"
     return environment
+
+
+PROCESS_WINDOWS = os.name == "nt"
+
+
+def run_proposal(command, *, input, timeout, **kwargs):
+    """Own the wrapper and descendants; subprocess.run kills only the wrapper."""
+    grouping = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if PROCESS_WINDOWS
+                else {"start_new_session": True})
+    with subprocess.Popen(command, stdin=subprocess.PIPE, stderr=subprocess.PIPE,
+                          **grouping, **kwargs) as process:
+        try:
+            stdout, stderr = process.communicate(input, timeout=timeout)
+        except BaseException:
+            if PROCESS_WINDOWS:
+                killed = subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if killed.returncode and process.poll() is None:
+                    process.kill()
+                    process.wait()
+                    raise RuntimeError("Could not verify termination of the proposal process tree.")
+            else:
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            process.communicate()
+            raise
+        return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+
+
+def failure_detail(stderr):
+    # A raw tail can still contain player data. Expose only fixed diagnostic categories.
+    tail = (stderr or "")[-2000:].lower()
+    if any(word in tail for word in ("network", "connection", "connect", "dns")):
+        return " Check the client's network connection."
+    if any(word in tail for word in ("authentication", "unauthorized", "api key", "login")):
+        return " Check the selected client's authentication."
+    return " Client diagnostics were withheld because they may contain player data."
 
 
 def portable_prompt(role):
@@ -110,13 +150,14 @@ def apply_recap(recap, repo=REPO, client=None):
             if os.environ.get("SCIONBOOK_MODEL"):
                 command[1:1] = ["--model", os.environ["SCIONBOOK_MODEL"]]
             try:
-                completed = subprocess.run(command, input=prompt, text=True, encoding="utf-8", cwd=temporary,
+                completed = run_proposal(command, input=prompt, text=True, encoding="utf-8", cwd=temporary,
                                            stdout=subprocess.DEVNULL if client == "codex" else subprocess.PIPE,
                                            env=proposal_environment(client), timeout=PROPOSAL_TIMEOUT)
             except subprocess.TimeoutExpired as exc:
                 raise RuntimeError("Recap proposal timed out after 10 minutes; no files were installed or follow-up started.") from exc
             if completed.returncode:
-                raise RuntimeError("Recap proposal failed; no follow-up chat was started.")
+                raise RuntimeError("Recap proposal failed; no follow-up chat was started."
+                                   + failure_detail(getattr(completed, "stderr", "")))
             try:
                 unexpected = {p.name for p in Path(temporary).iterdir()} - {"schema.json", "result.json"}
                 if unexpected:

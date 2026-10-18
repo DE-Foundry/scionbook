@@ -48,7 +48,7 @@ def fake_apply(monkeypatch, receipt=None, code=0, raw=None):
         elif receipt is not None:
             result.write_text(json.dumps(receipt))
         return SimpleNamespace(returncode=code)
-    monkeypatch.setattr(handoff.subprocess, "run", run)
+    monkeypatch.setattr(handoff, "run_proposal", run)
     return calls
 
 
@@ -244,7 +244,7 @@ def test_claude_apply_is_ephemeral_file_only_and_checks_structured_receipt(tmp_p
     def run(command, **kwargs):
         calls.append((command, kwargs))
         return SimpleNamespace(returncode=0, stdout=json.dumps({"structured_output": receipt}))
-    monkeypatch.setattr(handoff.subprocess, "run", run)
+    monkeypatch.setattr(handoff, "run_proposal", run)
     monkeypatch.setenv("LODESTONE_COOKIE", "test-only-value")
     monkeypatch.setenv("SCIONBOOK_CLIENT", "claude")
     assert handoff.apply_recap(recap, tmp_path)["status"] == "applied"
@@ -264,7 +264,7 @@ def test_claude_apply_is_ephemeral_file_only_and_checks_structured_receipt(tmp_p
 
 @pytest.mark.parametrize("stdout", ["not JSON", "{}", json.dumps({"structured_output": None})])
 def test_claude_apply_without_valid_receipt_is_not_success(tmp_path, monkeypatch, stdout):
-    monkeypatch.setattr(handoff.subprocess, "run",
+    monkeypatch.setattr(handoff, "run_proposal",
                         lambda *a, **k: SimpleNamespace(returncode=0, stdout=stdout))
     with pytest.raises(RuntimeError):
         handoff.apply_recap("Approved recap", tmp_path, client="claude")
