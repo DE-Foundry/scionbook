@@ -12,6 +12,16 @@ permissions:
   contents: read
 
 jobs:
+  instruction-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Check instruction source before packaging or publication
+        run: python3 -I scripts/check_instruction_security.py --head "$(git rev-parse HEAD)"
+
   pytest:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 10
@@ -46,7 +56,7 @@ jobs:
         run: python -m pytest tests/ -q --tb=short --durations=10
 
   release:
-    needs: [pytest, quality, package]
+    needs: [pytest, quality, package, instruction-security]
     if: >-
       github.event.repository.fork == false &&
       github.ref == 'refs/heads/main' &&

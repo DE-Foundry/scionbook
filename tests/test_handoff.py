@@ -22,6 +22,22 @@ def test_invalid_recap_never_starts_an_agent_or_creates_staging(tmp_path, monkey
     assert not list(tmp_path.iterdir())
 
 
+@pytest.fixture(autouse=True)
+def configured_repo(request, tmp_path):
+    if request.node.name.startswith(("test_apply_pipes", "test_non_success", "test_missing_or", "test_nonzero", "test_claude_apply")):
+        config = {"version": 1, "character_id": "123456", "name": "Example Hero",
+                  "world": "Example", "data_center": "Example", "timezone": "UTC", "mode": "public"}
+        (tmp_path / "scionbook.json").write_text(json.dumps(config))
+        skill = tmp_path / ".agents/skills/apply-recap/SKILL.md"
+        skill.parent.mkdir(parents=True)
+        skill.write_text("Synthetic skill: dated outcomes stay separate from routine boxes.\n")
+
+
+def proposal():
+    return {"status": "proposed", "changes": [
+        {"path": "SCIONBOOK_MEMORY.md", "content": "# Memory (v5)\nSession 2026-10-18: Report saved.\n"}]}
+
+
 def fake_apply(monkeypatch, receipt=None, code=0, raw=None):
     calls = []
     def run(command, **kwargs):
@@ -32,28 +48,28 @@ def fake_apply(monkeypatch, receipt=None, code=0, raw=None):
         elif receipt is not None:
             result.write_text(json.dumps(receipt))
         return SimpleNamespace(returncode=code)
-    monkeypatch.setattr(handoff.subprocess, "run", run)
+    monkeypatch.setattr(handoff, "run_proposal", run)
     return calls
 
 
 def test_apply_pipes_only_approved_recap_and_checks_receipt(tmp_path, monkeypatch):
     recap = "What's worth saving: Item $(touch do-not-run); `echo no`; new line\nMore reports"
-    receipt = {"status": "applied", "summary": "Saved verified reports."}
+    receipt = proposal()
     calls = fake_apply(monkeypatch, receipt)
     monkeypatch.setenv("LODESTONE_COOKIE", "test-only-value")
-    assert handoff.apply_recap(recap, tmp_path) == receipt
+    assert handoff.apply_recap(recap, tmp_path)["status"] == "applied"
     command, kwargs = calls[0]
     assert "exec" in command and "--ephemeral" in command and command[-1] == "-"
     assert not any(word in command for word in ("resume", "fork", "--last"))
     assert recap not in " ".join(command)
     assert json.dumps(recap, ensure_ascii=False) in kwargs["input"]
     assert "LODESTONE_COOKIE" not in kwargs["env"]
-    assert command[command.index("--sandbox") + 1] == "workspace-write"
+    assert command[command.index("--sandbox") + 1] == "read-only"
     assert command[command.index("--ask-for-approval") + 1] == "never"
     assert "memories.use_memories=false" in command
     assert "memories.generate_memories=false" in command
     assert "agents.enabled=false" in command
-    assert not list((tmp_path / ".scionbook-tmp").iterdir())
+    assert not list(tmp_path.glob(".scionbook-*"))
 
 
 @pytest.mark.parametrize("receipt", [
@@ -66,7 +82,7 @@ def test_non_success_or_invalid_receipt_stops_handoff(tmp_path, monkeypatch, rec
     fake_apply(monkeypatch, receipt)
     with pytest.raises(RuntimeError, match="stopped"):
         handoff.apply_recap("Approved recap", tmp_path)
-    assert not list((tmp_path / ".scionbook-tmp").iterdir())
+    assert not list(tmp_path.glob(".scionbook-*"))
 
 
 @pytest.mark.parametrize("raw", [None, "not JSON"])
@@ -223,32 +239,32 @@ def test_unknown_client_is_rejected(tmp_path):
 
 def test_claude_apply_is_ephemeral_file_only_and_checks_structured_receipt(tmp_path, monkeypatch):
     recap = "What's worth saving: $(touch nope)"
-    receipt = {"status": "applied", "summary": "Saved."}
+    receipt = proposal()
     calls = []
     def run(command, **kwargs):
         calls.append((command, kwargs))
         return SimpleNamespace(returncode=0, stdout=json.dumps({"structured_output": receipt}))
-    monkeypatch.setattr(handoff.subprocess, "run", run)
+    monkeypatch.setattr(handoff, "run_proposal", run)
     monkeypatch.setenv("LODESTONE_COOKIE", "test-only-value")
     monkeypatch.setenv("SCIONBOOK_CLIENT", "claude")
-    assert handoff.apply_recap(recap, tmp_path) == receipt
+    assert handoff.apply_recap(recap, tmp_path)["status"] == "applied"
     command, kwargs = calls[0]
     assert command[0] == "claude" and "-p" in command and "--no-session-persistence" in command
     assert command[command.index("--permission-mode") + 1] == "dontAsk"
-    denied = command[command.index("--disallowedTools") + 1:]
-    assert {"Bash", "Agent"} <= set(denied)
+    assert command[command.index("--tools") + 1] == ""
+    assert "--strict-mcp-config" in command
     assert json.loads(command[command.index("--json-schema") + 1]) == handoff.RESULT_SCHEMA
     assert recap not in " ".join(command)
     assert json.dumps(recap, ensure_ascii=False) in kwargs["input"]
-    assert "$apply-recap" not in kwargs["input"] and "apply-recap skill" in kwargs["input"]
-    assert kwargs["cwd"] == str(tmp_path)
+    assert kwargs["cwd"] != str(tmp_path)
+    assert "--setting-sources" in command
     assert "LODESTONE_COOKIE" not in kwargs["env"]
     assert kwargs["env"]["CLAUDE_CODE_DISABLE_AUTO_MEMORY"] == "1"
 
 
 @pytest.mark.parametrize("stdout", ["not JSON", "{}", json.dumps({"structured_output": None})])
 def test_claude_apply_without_valid_receipt_is_not_success(tmp_path, monkeypatch, stdout):
-    monkeypatch.setattr(handoff.subprocess, "run",
+    monkeypatch.setattr(handoff, "run_proposal",
                         lambda *a, **k: SimpleNamespace(returncode=0, stdout=stdout))
     with pytest.raises(RuntimeError):
         handoff.apply_recap("Approved recap", tmp_path, client="claude")

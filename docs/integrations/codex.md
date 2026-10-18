@@ -65,12 +65,14 @@ python3 scionbook_handoff.py session --confirmed
 
 `--confirmed` records an answer already received; it does not replace asking. Do not pass recap text as
 shell command syntax, interpolate it into an unquoted heredoc, or put it in process arguments. Use structured
-stdin transport where available. The helper runs a fresh `codex exec --ephemeral` for apply, checks its
-structured success result, then launches a separate interactive Maintainer. It refuses to start without a
-terminal, even before apply. No recap is persisted as an intermediate file. Temporary schemas/results live
-under ignored `.scionbook-tmp/` and are removed after the run. Durable gameplay saves follow apply-recap.
-The apply run uses workspace-write/never and stops if it needs approval or clarification; the follow-up
-Maintainer uses workspace-write/on-request. Session uses read-only/never. No sandbox bypass is used.
+stdin transport where available. The helper requests a fresh, ephemeral, read-only Codex proposal from
+selected snapshots. Python validates the allowlisted changes, saves them, verifies the bytes, and only
+then launches the separate interactive Maintainer. It refuses to start without a terminal, even before
+proposal generation. Temporary schemas/results live outside the checkout and are removed after the run;
+ignored transaction backups remain only after an interrupted installation. The proposal uses never approval,
+disabled shell/web tools, and suppressed user settings; set `SCIONBOOK_MODEL` to choose its model.
+The follow-up Maintainer uses workspace-write/on-request. Session uses read-only/never. No sandbox bypass
+is used. See [instruction security](../instruction-security.md) for client/authentication limits and recovery.
 
 The Session Planner has a narrow exception to invoke this confirmed handoff transport, subject to runtime
 permissions. It may not use that exception to make arbitrary writes or start other work. Never escalate a

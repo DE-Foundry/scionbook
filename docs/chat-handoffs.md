@@ -85,7 +85,9 @@ python3 scionbook_handoff.py session --client claude --confirmed
 ```
 
 Pass only the approved recap through stdin. The apply step uses a fresh, nonpersistent process,
-file read/edit tools only, and a structured success receipt before the separate Maintainer launch.
+no built-in tools, and a structured proposal. Python validates and installs only permitted player files,
+then verifies saved bytes before the separate Maintainer launch. See [instruction security](instruction-security.md)
+for the allowlist, client requirements, and interrupted-save recovery.
 The helper checks for an interactive terminal before any save. `--confirmed` records approval
 already received, not permission to skip asking. Never run this as an unattended nested interactive
 chat in an app tool; use manual handoff when a user-accessible terminal is unavailable.
