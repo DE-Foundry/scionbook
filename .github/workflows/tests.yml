@@ -3,7 +3,7 @@ name: Tests
 on:
   push:
   pull_request:
-    types: [opened, synchronize, reopened, edited]
+    types: [opened, synchronize, reopened]
   workflow_dispatch:
   schedule:
     - cron: '17 8 * * 1'
@@ -72,19 +72,9 @@ jobs:
       - name: Publish verified release and enforce retention
         env:
           GH_TOKEN: ${{ github.token }}
+          SCIONBOOK_RELEASE_DENYLIST: ${{ secrets.SCIONBOOK_RELEASE_DENYLIST }}
         run: python scripts/publish_release.py
 
-
-  pr-title:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-        with:
-          persist-credentials: false
-      - name: Validate squash commit title
-        run: python3 scripts/check_pr_title.py
 
   quality:
     runs-on: ubuntu-latest
@@ -102,10 +92,10 @@ jobs:
         run: |
           go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
           "$GOBIN/actionlint"
-      - name: Audit runtime and development dependencies
+      - name: Audit shipped runtime dependencies
         run: |
           python -m pip install -r requirements-ci.txt
-          python -m pip_audit -r requirements-ci.txt --progress-spinner off
+          python -m pip_audit -r requirements.txt --progress-spinner off
 
   package:
     strategy:
@@ -125,3 +115,18 @@ jobs:
           python-version: '3.14'
       - name: Install and exercise extracted release ZIP
         run: python scripts/smoke_release.py
+
+  development-audit:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.14'
+      - run: |
+          python -m pip install -r requirements-ci.txt
+          python -m pip_audit -r requirements-ci.txt --progress-spinner off

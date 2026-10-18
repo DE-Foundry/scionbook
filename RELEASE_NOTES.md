@@ -1,6 +1,6 @@
 ## Changes and compatibility
 
-The first automated release is 0.1.0. It packages Scionbook's portable assistant workflows,
+This release packages Scionbook's portable assistant workflows,
 character setup and reporting tools, crafting protection, and ZIP/fork installation instructions.
 Public-release automation adds dependency and workflow checks, Windows Python coverage, extracted-ZIP
 installation checks, and tested-main publication with verified checksums and four-release retention.

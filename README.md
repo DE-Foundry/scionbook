@@ -358,22 +358,10 @@ or quest history. Setup tests cover exact matches, ambiguous/missing profiles, c
 and prevention of cross-character overwrites. External services: Lodestone, Universalis, the Teamcraft item
 name database, and XIVAPI for optional recipe/vendor data. No credentials are needed for the test suite.
 
-[GitHub Actions](.github/workflows/tests.yml) runs the suite on pushes, pull requests, and manual dispatch:
-Python 3.10 and 3.14 on Ubuntu, plus Python 3.14 on macOS and Windows. The workflow installs `requirements-dev.txt`
-and runs `python -m pytest tests/ -q` with read-only repository permissions and no account secrets.
-Workflow linting, dependency auditing, Conventional Commit PR-title validation, and extracted-ZIP
-installation checks on Linux/Windows supplement the test suite. Tests also run weekly; CodeQL scans
-Python and Actions through GitHub default setup. See [public-release controls](docs/public-release.md).
-After tests, quality checks, and package checks pass on a push to `main`, a separate job with write permission publishes the versioned ZIP and
-checksum, starting at `0.1.0`, and retains the current plus three previous releases. PRs, feature branches,
-and personal forks do not publish releases. See [automatic publication](docs/releasing.md#automatic-publication-after-merge).
-These are offline fixture tests, not live Lodestone compatibility checks. The optional Bash launchers
-(Codex and Claude Code, using stub executables) are tested on Linux and macOS; Windows skips those
-adapter tests and the POSIX symlink fixture, while testing Python tools and actual ZIP extraction.
-
-Releases are versioned ZIP archives with checksums; keep the current version plus three previous
-versions. Build and review them using [releasing](docs/releasing.md). A fresh-history export is optional for
-checkouts whose history should not be published.
+[GitHub Actions](.github/workflows/tests.yml) tests Python 3.10/3.14 across Linux, macOS, and Windows,
+lints workflows, audits runtime dependencies, and smoke-tests extracted ZIPs. PR titles are checked
+separately. Bash adapter tests run on Linux/macOS. These are offline checks, not live service certification.
+See [public CI controls](docs/public-release.md) and [release policy and retries](docs/releasing.md).
 
 ## Contributing and public releases
 

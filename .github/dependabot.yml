@@ -17,3 +17,6 @@ updates:
     commit-message:
       prefix: ci
       include: scope
+    groups:
+      actions-dependencies:
+        patterns: ['*']

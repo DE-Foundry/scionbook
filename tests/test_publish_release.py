@@ -14,7 +14,7 @@ from test_export_release import source, git
     (None, ['feat!: first version'], '0.1.0'),
     ('0.1.0', ['feat(setup): option'], '0.2.0'),
     ('0.1.0', ['fix: correct report'], '0.1.1'),
-    ('0.1.0', ['docs: update usage', 'ci: update jobs'], '0.1.1'),
+    ('0.1.0', ['docs: update usage', 'ci: update jobs'], None),
     ('0.1.0', ['fix!: new data format'], '0.2.0'),
     ('1.2.3', ['feat: something', 'fix: change\n\nBREAKING CHANGE: new format'], '2.0.0'),
     ('1.2.3', ['refactor: change\n\nBREAKING-CHANGE: new format'], '2.0.0'),
@@ -106,21 +106,24 @@ def test_publish_verifies_before_pruning_and_never_replaces_published_assets(
         assert not any(c[:2] in [('release', 'upload'), ('release', 'edit')] for c in calls)
 
 
-def test_first_release_creates_draft_at_tested_sha_before_publication(tmp_path, monkeypatch):
+def test_first_release_creates_draft_at_tested_sha_before_publication(source, tmp_path, monkeypatch):
     calls = []
     state = []
     artifact = tmp_path / 'scionbook-0.1.0.zip'
     artifact.write_bytes(b'zip')
     monkeypatch.setattr(release, 'releases', lambda: state)
     monkeypatch.setattr(release, 'plan', lambda _: '0.1.0')
-    monkeypatch.setattr(release, 'git', lambda *args: 'tested-sha')
+    (source / 'RELEASE_NOTES.md').write_text('Fixture compatibility notes')
+    git(source, 'add', 'RELEASE_NOTES.md')
+    git(source, 'commit', '-qm', 'feat: fixture release')
+    tested_sha = git(source, 'rev-parse', 'HEAD').strip()
     monkeypatch.setattr(release.package, 'build', lambda *args: artifact)
     def command(*args):
         calls.append(args)
         if args[:2] == ('release', 'create'):
-            assert args[args.index('--target') + 1] == 'tested-sha'
+            assert args[args.index('--target') + 1] == tested_sha
             assert '--draft' in args
-            assert 'Existing local configuration' in Path(args[args.index('--notes-file') + 1]).read_text()
+            assert 'Fixture compatibility notes' in Path(args[args.index('--notes-file') + 1]).read_text()
             state.append({'tag_name': 'v0.1.0', 'draft': True, 'prerelease': False})
         if args[:2] == ('release', 'edit'):
             assert calls[-2] == ('verified',)
@@ -131,3 +134,41 @@ def test_first_release_creates_draft_at_tested_sha_before_publication(tmp_path, 
     assert [call[:2] for call in calls] == [
         ('release', 'create'), ('release', 'upload'), ('verified',),
         ('release', 'edit'), ('verified',)]
+
+
+def test_notes_include_subjects_and_only_changed_appendix(source):
+    (source / 'RELEASE_NOTES.md').write_text('Initial appendix')
+    git(source, 'add', 'RELEASE_NOTES.md')
+    git(source, 'commit', '-qm', 'feat: first release')
+    assert 'Initial appendix' in release.release_notes('0.1.0')
+    git(source, 'tag', 'v0.1.0')
+    git(source, 'commit', '--allow-empty', '-qm', 'fix: reviewed subject\n\nUnreviewed body')
+    notes = release.release_notes('0.1.1')
+    assert 'fix: reviewed subject' in notes
+    assert 'Initial appendix' not in notes
+    assert 'Unreviewed body' not in notes
+    (source / 'RELEASE_NOTES.md').write_text('New migration notes')
+    git(source, 'add', 'RELEASE_NOTES.md')
+    git(source, 'commit', '-qm', 'docs: migration')
+    assert 'New migration notes' in release.release_notes('0.1.1')
+
+
+def test_runtime_dependencies_publish_even_with_chore_title(source):
+    git(source, 'tag', 'v0.1.0')
+    git(source, 'commit', '--allow-empty', '-qm', 'ci: maintenance')
+    assert release.plan([]) is None
+    (source / 'requirements.txt').write_text('example>=1')
+    git(source, 'add', 'requirements.txt')
+    git(source, 'commit', '-qm', 'chore(deps): runtime update')
+    assert release.plan([]) == '0.1.1'
+
+
+def test_published_retry_verifies_hosted_checksum_without_rebuild(tmp_path, monkeypatch):
+    artifact = tmp_path / 'scionbook-0.1.0.zip'  # deliberately absent
+    def download(*args):
+        directory = Path(args[args.index('--dir') + 1])
+        (directory / artifact.name).write_bytes(b'original compression')
+        (directory / (artifact.name + '.sha256')).write_text(
+            hashlib.sha256(b'original compression').hexdigest() + '  ' + artifact.name)
+    monkeypatch.setattr(release, 'gh', download)
+    release.verify('v0.1.0', artifact, False)

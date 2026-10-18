@@ -63,10 +63,9 @@ Examples: `feat(setup): add public-mode setup`, `fix(report): preserve unavailab
 a `BREAKING CHANGE:` footer. See standards.md and docs/releasing.md for SemVer and the compatibility
 contract. Do not rewrite existing history simply to retrofit commit style.
 
-Successful main test runs publish automatically, starting at 0.1.0. Keep RELEASE_NOTES.md current
-with changes, compatibility, and migration/rollback guidance before merging. Use a Conventional Commit
-squash title or Conventional Commits on the merged branch so version selection has the intended meaning.
-See docs/releasing.md for bump rules and retry behavior. PR and fork tests never publish releases.
+Follow [release policy](docs/releasing.md) for version selection, release notes, and retries.
+Add compatibility/migration guidance to RELEASE_NOTES.md when a change requires it.
+Before your first push, configure the [local privacy hook](docs/releasing.md#privacy-before-push).
 
 Never include real character names/IDs, character profile links, account links, personal information,
 credentials, player reports, or preferences in contributions, branches, tags, releases, commit messages,

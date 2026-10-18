@@ -15,7 +15,7 @@ The compatibility contract covers documented CLI arguments, configuration and sa
 and documented skill entry points. Backward-compatible features increment MINOR, fixes increment
 PATCH, and incompatible changes increment MAJOR. During initial 0.y.z development, incompatible
 changes increment MINOR and must still be clearly documented. A transparent migration preserving
-existing workflows does not itself break compatibility. Published contents are immutable.
+existing workflows does not itself break compatibility. Published contents must never be overwritten. Platform immutability is evaluated below.
 
 Stable releases use `vMAJOR.MINOR.PATCH` tags. The initial automated release is **0.1.0**.
 The package builder currently accepts stable versions only; prerelease and build-metadata channels
@@ -44,20 +44,29 @@ subsequent versions use all non-merge commit messages since the highest stable v
 - A `BREAKING CHANGE:` / `BREAKING-CHANGE:` footer or Conventional Commit `!` bumps MAJOR at 1.0.0+,
   or MINOR while the major version is zero.
 - Otherwise, any `feat` commit bumps MINOR.
-- All other changes, including fixes, documentation, CI, and housekeeping, bump PATCH.
+- Ranges containing only `ci`, `test`, `docs`, or `chore` commits do not publish. Those subjects
+  remain in the range for the next release. Changes to `requirements.txt` always warrant at least a
+  PATCH so runtime dependency/security updates reach ZIP users.
+- Other changes bump PATCH. Breaking markers take precedence over maintenance filtering.
 
 Use Conventional Commits for individual commits and squash-merge titles. An ordinary merge includes
 its underlying commits in version analysis; the generated merge-message wrapper is ignored. Keep tags
 even after release retention deletes old download entries. Do not manually move or reuse version tags.
 
-Follow the [approved public-release procedure](public-release.md). Before merging, update `RELEASE_NOTES.md` with the release's changes, compatibility, migration, and
-rollback guidance. Its reviewed text is included in the GitHub release; commit author metadata and
-unreviewed commit bodies are not copied into release notes. Approval and merge authorize this automated
-publication; they do not authorize an assistant to merge or publish manually outside the workflow.
+Follow the [approved public-release procedure](public-release.md). Generated notes list non-merge commit
+subjects since the previous stable tag (reviewed squash PR titles). Author metadata and commit bodies
+are not copied. `RELEASE_NOTES.md` is an optional reviewed compatibility/migration appendix: it is appended
+only when changed relative to the previous release, or when present for the first release. Update it
+when a change needs installation, migration, backup, or rollback guidance; routine dependency PRs need
+no manual notes edit. Approval and merge authorize automated publication, not an assistant merge.
 
-Publication builds and privacy-checks the ZIP, creates a draft for the tested SHA, uploads ZIP/checksum,
+Publication requires a nonempty `SCIONBOOK_RELEASE_DENYLIST` secret for content scanning, checks private
+paths, builds the ZIP, and creates a draft for the tested SHA, uploads ZIP/checksum,
 and downloads both to verify them against the local build before publishing. It verifies the published
-assets again before deleting older release entries and their assets. Source tags are retained.
+assets against their hosted checksum again before deleting older release entries and assets. Source
+tags are retained. Already-published retries never rebuild or compare compressed bytes against a new
+runner; compression implementations can differ. Hosted checksums detect corruption, not malicious
+replacement of both assets.
 Fork owners who deliberately want their own releases must opt in by changing the fork guard themselves;
 ordinary fork updates never publish player data.
 
@@ -74,6 +83,32 @@ Investigate an asset mismatch or divergent tag ancestry rather than changing exi
 For setup, enable Actions and allow the workflow's `contents: write` permission under repository or
 organization policy. The first successful main run containing this workflow publishes `v0.1.0` when no
 stable version tags exist; older merged commits without this job cannot publish retroactively.
+
+## Privacy before push
+
+A public push exposes content before CI runs. Every development checkout must install the local hook:
+
+```bash
+python3 scripts/check_push.py --install
+```
+
+Populate ignored `.scionbook-release-denylist` with private identifying terms, one per line (at least four
+characters). Local character/snapshot identity terms are also loaded when available. Do not put real
+terms in tracked configuration, issues, or logs. The hook reuses `export_release.scan` and checks all
+reachable commit files, commit messages/author metadata, and pushed ref names, including files deleted
+before the tip. It fails closed without effective terms. Existing custom hook configurations are not
+overwritten; integrate `python3 scripts/check_push.py` into the existing pre-push hook, passing its stdin.
+Hooks require installation in each clone and can be bypassed; they supplement review, not enforce it
+for every contributor. Use a nonpersonal Git identity before committing. A finding in history requires
+private investigation; deleting the file at HEAD does not remove it from a push.
+
+Maintainers must separately configure the Actions secret `SCIONBOOK_RELEASE_DENYLIST` with identifying
+terms. Only the release step receives it; PR/test/package jobs never do. `build_release.build` fails
+closed under CI without effective terms. Package smoke tests explicitly use structural-only mode
+(`require_terms=False`) to test installation without exposing private terms; they do not certify content
+privacy. Local builds scan available terms but cannot certify absent or unknown identifiers. No term
+scanner can recognize all personal information or binary metadata. CI is a publication backstop for
+ZIPs and cannot undo a public Git push.
 
 ## Build a release ZIP locally
 
@@ -162,3 +197,18 @@ Nothing is pushed. Terms shorter than four characters are skipped to limit false
 is an aid to review, not a guarantee: check for personal preferences, character-specific guidance,
 unknown identifiers, and private data in binary assets as well. Templates must stay neutral and
 fixtures synthetic.
+
+## Platform integrity options
+
+[Immutable releases](https://docs.github.com/en/code-security/concepts/supply-chain-security/immutable-releases)
+lock published assets and tags and generate a release attestation. GitHub allows deleting an entire
+immutable release; its tag name cannot be reused afterward. This is compatible with retaining source
+tags while pruning entire old release entries. The draft/upload/publish sequence already fits that model.
+Platform immutability is not enabled by this code change; validate retention with it before enabling it
+on the production repository.
+
+[Build provenance attestations](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations)
+record where and how an artifact was built. Adding `actions/attest-build-provenance` would require a pinned
+action, release-job `id-token: write` and `attestations: write`, and exposing the exact built ZIP to that
+step before publication. Document `gh attestation verify` for consumers and test retries against the
+original artifact. This is a separate future enhancement; the current checksum does not prove provenance.

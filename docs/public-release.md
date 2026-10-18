@@ -1,7 +1,7 @@
 # Public-release controls and verification
 
 The approved delivery method is a reviewed PR, required CI checks, a squash merge into protected
-`main`, and automated publication of the tested commit. The first release is 0.1.0. Players choose
+`main`, and publication under the [release policy](releasing.md). Players choose
 a [release ZIP or personal fork](installation.md); contributors use branches and PRs.
 
 ## Repository settings
@@ -31,15 +31,17 @@ Python fixture tests block live HTTP and remove the Lodestone cookie. Bash adapt
 Linux/macOS-only. Package checks build from committed source, extract into a new directory, install
 requirements in a fresh environment, verify hidden adapter/template files, and start all five CLI entry
 points with `--help`. They exercise installation, not authenticated scraping or every assistant client.
-Weekly tests/audits can detect newly reported dependency problems without a source change; scheduled
+Runtime dependency audits gate releases; development/CI dependencies are audited separately on weekly
+and manual runs without gating publication. PR-title edits run only the title workflow. Weekly tests
+can detect newly reported dependency problems without a source change; scheduled
 runs do not publish releases. No CI job needs a Lodestone cookie or player files.
 
 ## Before merging
 
 1. Review the exact diff, dependency updates, CodeQL findings, and any secret alerts. Use synthetic
    fixtures. Never include player state, profile/account links, real captures, or personal preferences.
-2. Ensure the PR title selects the intended version bump. Update RELEASE_NOTES.md with changes,
-   compatibility, and migration/rollback instructions; do not copy personal data into release notes.
+2. Follow [version and release-note policy](releasing.md#automatic-publication-after-merge).
+   Confirm the local privacy hook and release-job denylist are configured; never print private terms.
 3. Wait for all required checks on the current PR revision and resolve conversations. For outside
    contributors, review code/workflow changes before approving execution. Never run untrusted PR code
    with write tokens or secrets through a privileged pull-request-target workflow.
@@ -52,8 +54,7 @@ runs do not publish releases. No CI job needs a Lodestone cookie or player files
    fresh directory, and follow the documented installation. Confirm skills/templates and CLI startup.
 3. For state-format changes, test migration on a private copy and verify character identity, report
    continuity, and original snapshot timestamps. Keep the matching prior application/state backup.
-4. Confirm that the release listing contains the current and previous three stable versions (or fewer
-   before four exist), with source tags retained. Drafts and prereleases are outside that cleanup policy.
+4. Confirm the release listing and retained tags satisfy [retention policy](releasing.md#versioning-and-retention).
 5. If publication fails, follow [release retry instructions](releasing.md#retry-a-failed-release).
    Do not overwrite a published ZIP or move its tag. Correct faulty code through a PR and a new version.
    Stop promoting a release if installation, integrity, or state preservation fails.

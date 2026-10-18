@@ -13,7 +13,7 @@ import build_release
 def smoke():
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
-        artifact = build_release.build('0.1.0', root / 'packages')
+        artifact = build_release.build('0.1.0', root / 'packages', require_terms=False)
         with zipfile.ZipFile(artifact) as archive:
             archive.extractall(root / 'extracted')
         project = root / 'extracted/scionbook-0.1.0'

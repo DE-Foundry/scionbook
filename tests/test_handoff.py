@@ -263,9 +263,13 @@ def test_start_chat_passes_client_to_launcher(monkeypatch):
 
 
 @pytest.mark.parametrize('role,skill', [('session', 'start-session'), ('maintainer', 'start-maintenance'), ('apply', 'apply-recap')])
-def test_app_draft_encodes_exact_workspace_and_skill_without_launch(tmp_path, monkeypatch, role, skill):
+@pytest.mark.parametrize('dirname', [
+    'A repo & # ü',
+    pytest.param('A repo & #? ü', marks=pytest.mark.skipif(sys.platform == 'win32', reason='Windows forbids ? in filenames')),
+])
+def test_app_draft_encodes_exact_workspace_and_skill_without_launch(tmp_path, monkeypatch, role, skill, dirname):
     from urllib.parse import urlsplit, parse_qs
-    repo = tmp_path / 'A repo & # ü'
+    repo = tmp_path / dirname
     repo.mkdir()
     monkeypatch.setattr(handoff.subprocess, 'run', lambda *a, **k: pytest.fail('launched agent'))
     url = urlsplit(handoff.app_draft_link(role, repo))

@@ -88,20 +88,10 @@ Use `<type>/<kebab-case-summary>` for branches and Conventional Commits
 `<type>[optional scope]: <summary>` for commit messages and pull request titles.
 Use `feat` for new functionality and `fix` for corrections; use `docs`, `test`,
 `refactor`, `chore`, or `ci` for changes of those kinds.
-Release versions follow Semantic Versioning: backward-compatible features warrant a minor
-increment, fixes warrant a patch increment, and incompatible public API changes warrant a
-major increment. Mark breaking changes with `!` and a `BREAKING CHANGE:` explanation.
-An internal cache migration that preserves existing workflows is not by itself a public API break.
-Branch creation does not establish a release version; create version tags only for an explicitly
-authorized release against the established version baseline.
-
-
-Releases are reviewed source ZIPs built with `scripts/build_release.py`, with SHA-256 checksums.
-Retain the current version and three previous versions (four total); retain source tags for provenance.
-The first automated release is 0.1.0. Successful main test runs publish releases and enforce hosted
-retention; PRs, feature branches, and personal forks do not publish. See docs/releasing.md for the
-compatibility contract, commit-based version bumps, publication/retry procedure, and hosted cleanup.
-Keep RELEASE_NOTES.md current with reviewed changes and compatibility/migration guidance before merge.
+Mark breaking changes with `!` and a `BREAKING CHANGE:` explanation.
+The authoritative [release policy](docs/releasing.md) defines SemVer, packaging, compatibility, version
+bumps, release notes, retention, privacy checks, and retries. Follow it for every publication.
+Branch creation does not establish a release version or authorize publication.
 No character identity, profile/account link, personal information, or player state may enter tracked
 content, commit messages, author metadata, branches, tags, or release assets. Private project branches
 and forks are not exceptions. Use a nonpersonal project identity for published Git authorship.

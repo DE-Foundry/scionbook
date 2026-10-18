@@ -15,6 +15,7 @@ Terms are matched case-insensitively. Nothing is pushed.
 import argparse
 import io
 import json
+import os
 from pathlib import Path, PurePosixPath
 import subprocess
 import sys
@@ -58,6 +59,13 @@ def read_terms(path):
     except OSError:
         return set()
     return {line.strip() for line in lines if line.strip() and not line.lstrip().startswith("#")}
+
+
+def identifying_terms():
+    terms = local_terms() | read_terms(REPO / DEFAULT_DENYLIST)
+    terms |= {line.strip() for line in os.environ.get('SCIONBOOK_RELEASE_DENYLIST', '').splitlines()
+              if line.strip() and not line.lstrip().startswith('#')}
+    return {term for term in terms if len(term) >= MIN_TERM}
 
 
 def personal_paths(names):
