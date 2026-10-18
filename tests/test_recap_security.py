@@ -246,8 +246,11 @@ def test_visible_unicode_and_layout_survive(repo):
 
 
 @pytest.mark.parametrize('client', ['codex', 'claude'])
-def test_skill_is_separate_from_data_and_timeout_releases_lock(repo, monkeypatch, client):
-    skill = (repo / store.SKILL).read_text()
+@pytest.mark.parametrize('newline', ['\n', '\r\n'], ids=['lf', 'crlf'])
+def test_skill_is_separate_from_data_and_timeout_releases_lock(repo, monkeypatch, client, newline):
+    skill = newline.join(['Synthetic skill: Café 日本語', 'Keep dated outcomes separate.', ''])
+    (repo / store.SKILL).write_bytes(skill.encode('utf-8'))
+    assert (repo / store.SKILL).read_bytes().decode('utf-8') == skill
     before = store.snapshot(repo)
     def timeout(command, **kwargs):
         prompt = kwargs['input']

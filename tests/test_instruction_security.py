@@ -56,7 +56,7 @@ def test_candidate_checker_cannot_replace_running_baseline(tmp_path):
     scripts = tmp_path / "scripts"
     scripts.mkdir()
     (scripts / "check_instruction_security.py").write_text("raise Exception('candidate executed')")
-    (tmp_path / "AGENTS.md").write_text("Hidden \u202e instruction")
+    (tmp_path / "AGENTS.md").write_text("Hidden \u202e instruction", encoding="utf-8")
     git("add", ".")
     git("commit", "-qm", "docs: candidate")
     result = check.scan(check.tree(tmp_path, git("rev-parse", "HEAD")), check.tree(tmp_path, base))
@@ -104,7 +104,7 @@ def test_tree_includes_nontraditional_instruction_names(tmp_path):
     git('init', '-q')
     git('config', 'user.name', 'Synthetic Contributor')
     git('config', 'user.email', 'synthetic@example.invalid')
-    (tmp_path / '.cursorrules').write_text('hidden\u200b')
+    (tmp_path / '.cursorrules').write_text('hidden\u200b', encoding='utf-8')
     git('add', '.')
     git('commit', '-qm', 'test: synthetic instruction')
     assert check.scan(check.tree(tmp_path, git('rev-parse', 'HEAD')))[0][0] == 'error'
