@@ -62,6 +62,11 @@ There is no standing commit/push authorization. Character identities, profile li
 preferences, gameplay reports, and personal information must never enter tracked files, branches,
 tags, release assets, or repository history. This includes private branches and forks used for project
 work. Never force-add player data or configure Git backups in this repository. Local player files stay ignored.
+Before any authorized push, ensure this checkout has the local denylist and privacy hook configured
+under docs/releasing.md#privacy-before-push. Keep identifying terms only in ignored local configuration;
+never put them in tracked examples or logs. Do not bypass a blocked push or use dummy terms to satisfy
+the check. Report missing setup or findings for private resolution within the user's authorized scope.
+The GitHub release secret does not replace local setup.
 Report local saves, refreshes, commits, and verified pushes separately.
 
 ## Skills and runtime

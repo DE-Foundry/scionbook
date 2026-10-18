@@ -86,15 +86,45 @@ stable version tags exist; older merged commits without this job cannot publish 
 
 ## Privacy before push
 
-A public push exposes content before CI runs. Every development checkout must install the local hook:
+A public push exposes content before CI runs. Everyone who pushes from a clone or personal fork must
+configure a local denylist and install the privacy hook in **each checkout**, including maintainers and
+agent-assisted contributors. ZIP-only users who do not use Git do not need a hook.
 
-```bash
-python3 scripts/check_push.py --install
+1. Create `.scionbook-release-denylist` in the repository root using a local editor. Add the identifying
+   terms you want kept private, one per line. Include character names, Lodestone character IDs, retainer
+   names, real names, personal email addresses, private account handles, and personal profile URLs as
+   applicable. Contributors without characters should still protect their personal identifiers.
+2. Use distinctive terms of at least four characters. Matching is case-insensitive and checks substrings.
+   Blank lines and lines beginning with `#` are ignored. Avoid generic world/job names or ordinary words
+   that would match legitimate source text. Do not add passwords or tokens; use credential scanning for
+   secrets. Local character/snapshot identities are also loaded automatically when available, but a
+   separate development checkout often has no such files.
+3. Install the hook and confirm Git ignores the denylist:
+
+   ```bash
+   python3 scripts/check_push.py --install
+   git check-ignore .scionbook-release-denylist
+   ```
+
+4. Review staged files and commit metadata before pushing. Keep the denylist current as identifiers
+   change. Never force-add it, its backups, or player files. Never copy real terms into documentation,
+   test fixtures, PRs, issues, or logs. The denylist is intentionally absent from clones and release ZIPs;
+   create it privately for each checkout instead of committing it for others.
+
+For illustration only, a synthetic denylist could contain:
+
+```text
+# Replace these fictional examples locally; they do not protect your own identifiers.
+Example Adventurer
+example-person@example.invalid
 ```
 
-Populate ignored `.scionbook-release-denylist` with private identifying terms, one per line (at least four
-characters). Local character/snapshot identity terms are also loaded when available. Do not put real
-terms in tracked configuration, issues, or logs. The hook reuses `export_release.scan` and checks all
+Do not use dummy terms merely to satisfy the nonempty check. If a push reports no configured terms,
+populate the ignored file and retry. If it reports a match, inspect the files/history privately; do not
+disable the hook or remove a legitimate term to get the push through. An agent must stop and report the
+block if it cannot resolve it within the user's authorized scope.
+
+The hook reuses `export_release.scan` and checks all
 reachable commit files, commit messages/author metadata, and pushed ref names, including files deleted
 before the tip. It fails closed without effective terms. Existing custom hook configurations are not
 overwritten; integrate `python3 scripts/check_push.py` into the existing pre-push hook, passing its stdin.
@@ -102,8 +132,11 @@ Hooks require installation in each clone and can be bypassed; they supplement re
 for every contributor. Use a nonpersonal Git identity before committing. A finding in history requires
 private investigation; deleting the file at HEAD does not remove it from a push.
 
-Maintainers must separately configure the Actions secret `SCIONBOOK_RELEASE_DENYLIST` with identifying
-terms. Only the release step receives it; PR/test/package jobs never do. `build_release.build` fails
+Maintainers must separately configure the Actions secret `SCIONBOOK_RELEASE_DENYLIST` with the
+identifying terms relevant to the release repository, using the same one-term-per-line format. The local
+file and secret serve different stages; neither replaces the other. GitHub secrets are not downloaded
+into local checkouts. Ordinary contributors need only their local file and hook; do not send private
+denylists to maintainers or add secrets to a personal fork merely to use it. Only the release step receives it; PR/test/package jobs never do. `build_release.build` fails
 closed under CI without effective terms. Package smoke tests explicitly use structural-only mode
 (`require_terms=False`) to test installation without exposing private terms; they do not certify content
 privacy. Local builds scan available terms but cannot certify absent or unknown identifiers. No term

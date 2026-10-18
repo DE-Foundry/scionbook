@@ -96,6 +96,10 @@ No character identity, profile/account link, personal information, or player sta
 content, commit messages, author metadata, branches, tags, or release assets. Private project branches
 and forks are not exceptions. Use a nonpersonal project identity for published Git authorship.
 Local runtime state remains ignored; personal backups must be separate from the project repository.
+Every contributor and maintainer must configure an ignored local denylist and install the privacy
+pre-push hook in each checkout before pushing, including personal forks and agent-assisted work.
+Follow [privacy setup](docs/releasing.md#privacy-before-push); never bypass a failed scan or commit its
+identifying terms. The release-job secret supplements local protection and does not replace it.
 
 
 ## Installation and updates

@@ -11,6 +11,12 @@ If you have upstream write access, clone upstream. Otherwise, fork the project a
 `origin` to the fork and add `upstream` pointing to the original repository as in the
 [installation guide](docs/installation.md#personal-fork). Never put character data on development branches.
 
+Before your first push from **each clone**, complete [privacy setup](docs/releasing.md#privacy-before-push):
+create your ignored `.scionbook-release-denylist`, populate it with your private identifying terms, and
+install the pre-push hook. This is required for every contributor and maintainer, including agent-assisted
+work and personal forks. Keep real identifiers out of PRs, examples, and shared configuration. A GitHub
+release secret does not replace this local setup.
+
 Start a focused branch from the current upstream default branch. The commands below assume `upstream`
 points to the original repository; use `origin` instead when you cloned upstream directly:
 
@@ -65,7 +71,6 @@ contract. Do not rewrite existing history simply to retrofit commit style.
 
 Follow [release policy](docs/releasing.md) for version selection, release notes, and retries.
 Add compatibility/migration guidance to RELEASE_NOTES.md when a change requires it.
-Before your first push, configure the [local privacy hook](docs/releasing.md#privacy-before-push).
 
 Never include real character names/IDs, character profile links, account links, personal information,
 credentials, player reports, or preferences in contributions, branches, tags, releases, commit messages,
