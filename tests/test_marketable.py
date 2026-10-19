@@ -1,5 +1,6 @@
 """Exercise market eligibility through the real report/pricing pipeline, offline."""
 import json
+import builtins
 import pathlib
 import sys
 from types import SimpleNamespace
@@ -143,6 +144,158 @@ def test_cli_retry_consent_reaches_both_pricing_scopes(run_report, monkeypatch, 
     assert any('Ask the user' in n for n in data['notes']) is not approved
     assert data['all_rows'][0]['price_source'] == 'history_median'
     assert data['all_rows'][1]['verdict'] == 'keep_unknown'
+
+
+@pytest.mark.parametrize('answer', ['yes', 'no'])
+def test_interactive_report_asks_once_for_both_scopes(run_report, monkeypatch, answer):
+    monkeypatch.setattr(report.sys.stdin, 'isatty', lambda: True)
+    prompts = []
+    def reply():
+        prompts.append(True)
+        return answer
+    monkeypatch.setattr(builtins, 'input', reply)
+    session, _ = run_report([1, 2], ids=(1, 2), available=(1,))
+    assert len(prompts) == 1
+    assert len(pricing_calls(session)) == (4 if answer == 'yes' else 2)
+
+
+def test_explicit_no_disables_prompts_even_with_a_terminal(run_report, monkeypatch):
+    monkeypatch.setattr(report.sys.stdin, 'isatty', lambda: True)
+    monkeypatch.setattr(builtins, 'input', lambda: pytest.fail('explicit no must not prompt'))
+    session, data = run_report([1, 2], ids=(1, 2), available=(1,),
+                               pricing_args=['--no-retry-pricing-single-items'])
+    assert len(pricing_calls(session)) == 2
+    assert any('not approved' in n for n in data['notes'])
+    assert not any('Ask the user' in n for n in data['notes'])
+
+
+def recovery_args(source, output, *flags):
+    return ['scionbook_report.py', '--id', '12345', '--world', 'Example World',
+            '--dc', 'Example DC', '--pricing-only-from', str(source),
+            '--out', str(output), *flags]
+
+
+def test_pricing_only_recovers_missing_ids_without_lodestone_or_credentials(
+        run_report, monkeypatch, tmp_path):
+    _, before = run_report([1, 2, 3], ids=(1, 2, 3, 4), available=(1,),
+                           dc_available=(2,), vendor_price=50,
+                           pricing_args=['--no-retry-pricing-single-items'])
+    source, output = tmp_path / 'status.json', tmp_path / 'status-priced.json'
+    report_path = tmp_path / 'cleanup-priced.md'
+    # Recovery must reuse saved protection rather than load/reconcile current files.
+    before['pricing_context']['protected_materials'] = ['item 3']
+    source.write_text(json.dumps(before))
+    original = source.read_bytes()
+    session = PricingSession([1, 2, 3], available=(1, 2, 3), dc_available=(1, 2, 3))
+    monkeypatch.setattr(report.requests, 'Session', lambda: session)
+    def forbidden(*args, **kwargs):
+        pytest.fail('pricing-only recovery must not scrape, authenticate, or reread protection')
+    for name in ('resolve_cookie', 'fetch', 'load_item_index', 'scrape_retainer',
+                 'fetch_marketable', 'load_protected_materials', 'load_quest_mats_meta'):
+        monkeypatch.setattr(report, name, forbidden)
+    monkeypatch.delenv('LODESTONE_COOKIE')
+    monkeypatch.setattr(report.sys.stdin, 'isatty', lambda: True)
+    monkeypatch.setattr(builtins, 'input', forbidden)
+    monkeypatch.setattr(sys, 'argv', recovery_args(
+        source, output, '--retry-pricing-single-items', '--report', str(report_path)))
+    report.main()
+    after = json.loads(output.read_text())
+    assert [urlsplit(u).path.rsplit('/', 1)[-1] for u in session.calls] == ['2', '3', '1', '3']
+    assert source.read_bytes() == original
+    for key in ('fetched_at_utc', 'character', 'jobs', 'quests', 'currencies',
+                'retainers', 'authenticated', 'mode'):
+        assert after[key] == before[key]
+    assert after['pricing_context']['world_prices']['1'] == before['pricing_context']['world_prices']['1']
+    assert after['pricing_context']['dc_prices']['2'] == before['pricing_context']['dc_prices']['2']
+    assert after['all_rows'][2]['verdict'] == 'protected_quest_material'
+    assert after['all_rows'][3]['verdict'] == 'vendor_or_discard'
+    assert after['all_rows'][3]['est_value'] == 50
+    assert after['summary']['estimated_recoverable_gil'] > before['summary']['estimated_recoverable_gil']
+    assert not any('not approved' in note or 'remain unpriced' in note for note in after['notes'])
+    assert 'Pricing recovery attempted' in after['report_md']
+    assert report_path.read_text() == after['report_md']
+
+
+def test_pricing_only_persists_gaps_and_can_resume_without_refetching_successes(
+        run_report, monkeypatch, tmp_path):
+    _, before = run_report([1, 2], ids=(1, 2), available=(), vendor_price=50,
+                           pricing_args=['--no-retry-pricing-single-items'])
+    source, output = tmp_path / 'status.json', tmp_path / 'status-priced.json'
+    session = PricingSession([1, 2], available=(1,), dc_available=())
+    monkeypatch.setattr(report.requests, 'Session', lambda: session)
+    monkeypatch.setattr(sys, 'argv', recovery_args(source, output, '--retry-pricing-single-items'))
+    report.main()
+    after = json.loads(output.read_text())
+    assert after['all_rows'][1]['est_value'] == 50
+    assert any('remain unpriced' in note for note in after['notes'])
+    assert not any('returned no data for any item' in note for note in after['notes'])
+    session.calls.clear()
+    monkeypatch.setattr(sys, 'argv', recovery_args(
+        output, tmp_path / 'status-priced-again.json', '--retry-pricing-single-items'))
+    report.main()
+    assert [urlsplit(u).path.rsplit('/', 1)[-1] for u in session.calls] == ['2', '1', '2']
+
+
+@pytest.mark.parametrize('damage', ['identity', 'timestamp', 'legacy', 'context'])
+def test_pricing_only_rejects_mismatched_or_unusable_sources_before_network(
+        run_report, monkeypatch, tmp_path, damage):
+    _, data = run_report([1], ids=(1,))
+    if damage == 'identity':
+        data['character_id'] = '99999'
+    elif damage == 'timestamp':
+        data['pricing_context']['source_fetched_at_utc'] = 'old'
+    elif damage == 'legacy':
+        del data['pricing_context']
+    else:
+        del data['pricing_context']['protected_materials']
+    source, output = tmp_path / 'status.json', tmp_path / 'status-priced.json'
+    source.write_text(json.dumps(data))
+    original = source.read_bytes()
+    monkeypatch.setattr(report.requests, 'Session', lambda: pytest.fail('invalid source must not contact services'))
+    monkeypatch.setattr(sys, 'argv', recovery_args(source, output, '--retry-pricing-single-items'))
+    with pytest.raises(SystemExit) as exc:
+        report.main()
+    assert exc.value.code == 2
+    assert not output.exists()
+    assert source.read_bytes() == original
+
+
+@pytest.mark.parametrize('flags', [[], ['--no-retry-pricing-single-items']])
+def test_pricing_only_requires_explicit_approval_before_reading_or_writing(
+        monkeypatch, tmp_path, flags):
+    output = tmp_path / 'status-priced.json'
+    monkeypatch.setattr(sys, 'argv', recovery_args(tmp_path / 'missing.json', output, *flags))
+    with pytest.raises(SystemExit) as exc:
+        report.main()
+    assert exc.value.code == 2
+    assert not output.exists()
+
+
+def test_pricing_only_cannot_overwrite_the_source_snapshot(run_report, monkeypatch, tmp_path):
+    run_report([1], ids=(1,))
+    source = tmp_path / 'status.json'
+    original = source.read_bytes()
+    monkeypatch.setattr(sys, 'argv', recovery_args(source, source, '--retry-pricing-single-items'))
+    with pytest.raises(SystemExit) as exc:
+        report.main()
+    assert exc.value.code == 2
+    assert source.read_bytes() == original
+
+
+@pytest.mark.parametrize('report_target', ['source', 'output'])
+def test_pricing_only_report_cannot_replace_snapshot_files(
+        run_report, monkeypatch, tmp_path, report_target):
+    run_report([1], ids=(1,))
+    source, output = tmp_path / 'status.json', tmp_path / 'status-priced.json'
+    original = source.read_bytes()
+    monkeypatch.setattr(sys, 'argv', recovery_args(
+        source, output, '--retry-pricing-single-items', '--report',
+        str(source if report_target == 'source' else output)))
+    with pytest.raises(SystemExit) as exc:
+        report.main()
+    assert exc.value.code == 2
+    assert source.read_bytes() == original
+    assert not output.exists()
 
 
 @pytest.mark.parametrize('batch_size', ['0', '-1'])

@@ -73,13 +73,14 @@ def test_prior_approval_retries_only_missing_ids(monkeypatch):
     assert session.calls == [[1, 2], [2]]
 
 
-def test_approved_retry_is_bounded_even_when_singletons_fail():
+def test_approved_retry_is_bounded_and_summarizes_singleton_failures(capsys):
     session, notes = BatchSession(fail_single=True), []
     out = report.fetch_prices([1, 2], 'Example DC', session, attempts=2,
                               retry_single_items=True, notes=notes)
     assert out == {}
     assert session.calls == [[1, 2], [1, 2], [1], [1], [2], [2]]
     assert any('remain unpriced' in n for n in notes)
+    assert capsys.readouterr().err.count('pricing batch failed') == 1  # initial batch only
 
 
 def test_batch_404_can_be_recovered_after_approval():
