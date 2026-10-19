@@ -68,6 +68,12 @@ local sale speed from it, or recommend the source World/DC as a selling destinat
 Missing market prices do not erase a known vendor sale value. Compare provisional DC references against
 vendor proceeds too; any resulting proceeds estimate is vendor-only. NPC purchase prices trigger a warning
 for either price source, never an automatic cap, because shop access may be gated.
+Check known market eligibility and vendor sale values before market pricing. Exclude market-prohibited
+items from price requests even when the global marketable catalog is unavailable; a missing vendor
+value alone does not establish market prohibition. After failed or partial pricing batches, ask before
+retrying missing items with a smaller batch size (1 item). Noninteractive runs must expose the question
+for the Maintainer to ask; no or silence does not authorize singleton recovery. Bound approved recovery
+and preserve successful prices, known vendor values, and disclosed unknowns.
 
 ## Credentials and output
 

@@ -57,18 +57,19 @@ def run_report(monkeypatch, tmp_path):
     monkeypatch.setattr(report, 'fetch_vendor_buy_prices', lambda *a, **k: {})
     monkeypatch.setattr(report.time, 'sleep', lambda _: None)
 
-    def run(catalog, ids=(1, 2, 3, 4), available=(1,), dc_available=None, protection_args=None, dc_price=500, vendor_price=None):
+    def run(catalog, ids=(1, 2, 3, 4), available=(1,), dc_available=None, protection_args=None, dc_price=500, vendor_price=None, market_allowed=None, pricing_args=()):
         session = PricingSession(catalog, available, dc_available, dc_price)
         monkeypatch.setattr(report.requests, 'Session', lambda: session)
         monkeypatch.setattr(report, 'load_item_index', lambda *a: {f'item {i}': i for i in ids})
         monkeypatch.setattr(report, 'scrape_retainer', lambda *a, **k: {
             'retainer_id': 'example', 'inventory': [
-                {'name': f'Item {i}', 'quantity': 1, 'hq': False, 'vendor_price': vendor_price}
+                {'name': f'Item {i}', 'quantity': 1, 'hq': False,
+                 'vendor_price': vendor_price, 'market_allowed': market_allowed}
                 for i in ids], 'market_listings': [], 'recent_sales': []})
         output = tmp_path / 'status.json'
         monkeypatch.setattr(sys, 'argv', ['scionbook_report.py', '--id', '12345',
             '--world', 'Example World', '--dc', 'Example DC', '--cookie-env',
-            '--fast', '--out', str(output)] + (protection_args if protection_args is not None else ['--no-quest-mats']))
+            '--fast', '--out', str(output)] + (protection_args if protection_args is not None else ['--no-quest-mats']) + list(pricing_args))
         report.main()
         return session, json.loads(output.read_text())
     return run
@@ -100,6 +101,55 @@ def test_all_nonmarketable_inventory_makes_no_price_requests(run_report):
     assert not pricing_calls(session)
     assert all('untradeable' in r['reason'] for r in data['all_rows'])
     assert not any('returned no data' in n or 'DC pricing' in n for n in data['notes'])
+
+
+@pytest.mark.parametrize('catalog', [[1], None])
+@pytest.mark.parametrize('vendor_price', [None, 50])
+def test_tooltip_prohibition_skips_market_requests_and_preserves_vendor_value(
+        run_report, monkeypatch, catalog, vendor_price):
+    def no_vendor_lookup(ids, *args, **kwargs):
+        assert ids == []
+        return {}
+    monkeypatch.setattr(report, 'fetch_vendor_buy_prices', no_vendor_lookup)
+    session, data = run_report(catalog, ids=(1,), market_allowed=False,
+                               vendor_price=vendor_price)
+    assert not pricing_calls(session)
+    row = data['all_rows'][0]
+    assert row['est_value'] == vendor_price
+    assert row['verdict'] == ('vendor_or_discard' if vendor_price else 'keep_unknown')
+
+
+def test_vendor_unsellable_item_can_still_be_market_priced(run_report):
+    session, data = run_report([1], ids=(1,), market_allowed=True, vendor_price=None)
+    assert len(pricing_calls(session)) == 2
+    assert data['all_rows'][0]['verdict'] == 'sell'
+
+
+def test_batch_size_override_applies_to_both_scopes(run_report):
+    session, _ = run_report([1, 2], ids=(1, 2), available=(1, 2),
+                           pricing_args=['--pricing-batch-size', '1'])
+    assert len(pricing_calls(session)) == 4
+    assert all(',' not in urlsplit(u).path for u in pricing_calls(session))
+
+
+@pytest.mark.parametrize('approved', [False, True])
+def test_cli_retry_consent_reaches_both_pricing_scopes(run_report, monkeypatch, approved):
+    monkeypatch.setattr(report.sys.stdin, 'isatty', lambda: False)
+    session, data = run_report(
+        [1, 2], ids=(1, 2), available=(1,),
+        pricing_args=['--retry-pricing-single-items'] if approved else [])
+    paths = [urlsplit(u).path.rsplit('/', 1)[-1] for u in pricing_calls(session)]
+    assert paths == (['1,2', '2', '1,2', '2'] if approved else ['1,2', '1,2'])
+    assert any('Ask the user' in n for n in data['notes']) is not approved
+    assert data['all_rows'][0]['price_source'] == 'history_median'
+    assert data['all_rows'][1]['verdict'] == 'keep_unknown'
+
+
+@pytest.mark.parametrize('batch_size', ['0', '-1'])
+def test_batch_size_must_be_positive(run_report, batch_size):
+    with pytest.raises(SystemExit) as exc:
+        run_report([1], pricing_args=['--pricing-batch-size', batch_size])
+    assert exc.value.code == 2
 
 
 @pytest.mark.parametrize('catalog', [requests.Timeout(), [], {}, {'error': 'down'}, None, [True], ['1'], [0], [1, -2]])

@@ -33,6 +33,15 @@ Full command:
 Public command:
 `python3 scionbook_report.py --anon --no-retainers --out .scionbook-tmp/status.json --report .scionbook-tmp/cleanup.md`
 
+Pricing checks tooltip market eligibility and vendor sale values before requesting market prices;
+market-prohibited items need no market lookup, and missing vendor value alone does not prohibit listing.
+If pricing still fails or returns partial batches, ask whether to retry missing prices with batch size 1.
+Interactive scraper runs prompt directly; for noninteractive runs, inspect pricing notes and ask in chat
+before retrying. No or silence means retain available results and disclose gaps. After Yes, use
+`--retry-pricing-single-items` for one bounded recovery pass, or `--pricing-batch-size 1` to start both
+scopes with single-item requests. Reuse approval already given for that retry. Revalidate all staged
+outputs from the approved rerun; do not loop indefinitely or treat pricing failures as credential failures.
+
 Before replacing anything, verify configured character ID/name/home world/data center, actual fresh
 fetched_at_utc, parsed profile and jobs, notes, and still_not_available. A cookie-presence authenticated flag
 is not sufficient. Full mode requires private quest/currency evidence, a known quest total equal to

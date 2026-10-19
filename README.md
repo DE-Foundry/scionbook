@@ -293,6 +293,12 @@ written only when a version 2 plan successfully reconciles; never install a left
 total. The history renderer refuses incomplete data and preserves its previous output. Additional flags:
 `--fast` skips achievements/collections, `--no-pricing` keeps unpriced inventory unknown, `--refresh-items`
 refreshes the shared item-name cache, and `--dump raw --probe` captures diagnostic HTML locally.
+Pricing uses batches of 50 items for the home World and 4 for the DC. `--pricing-batch-size N`
+overrides both (minimum 1). After failed or partial batches, an interactive run asks before retrying
+missing items in batches of 1. Noninteractive runs record that question in snapshot notes for the
+Maintainer to ask in chat. After approval, `--retry-pricing-single-items` authorizes one recovery pass
+of missing items; each request retains its bounded retries. No or silence leaves the available prices
+and vendor values intact, with gaps disclosed. Starting with batch size 1 does not trigger a smaller retry.
 The report is always rewritten when `--report` is supplied, including when no inventory report exists.
 
 The snapshot includes jobs, equipped-job gear attribution, quests, currencies/reputation, collections,
@@ -304,8 +310,10 @@ Inventory and current listings are disjoint; recent sales are already gone. Mark
 retainer. Realistic proceeds are constrained by sale depth, not simply price multiplied by all stock.
 Treat unresolved items and missing pricing evidence as unknown in cleanup advice; lack of a market price
 is not proof that an item is worthless. Known market-prohibited items may still have vendor value. The
-scraper filters pricing requests by Universalis marketability and warns if the marketability list is
-unavailable. Selling proceeds and liquidity estimates use the configured home World only. When its price
+scraper checks tooltip market eligibility and vendor sale values before pricing, then filters market
+requests by Universalis marketability. Market-prohibited items skip market pricing, including when the
+catalog is unavailable; known vendor values remain usable. Vendor-unsellable items can still be marketable.
+Unknown eligibility is disclosed and does not establish a prohibition. Selling proceeds and liquidity estimates use the configured home World only. When its price
 is missing, a usable DC price is labeled **Non-home-World price**, with its source and unit price. You can
 use it as a provisional starting listing price on your home World; local proceeds and sale speed remain
 unestimated. If neither scope has a usable price, the item remains unknown. Other Worlds/DCs are never

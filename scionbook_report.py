@@ -1010,7 +1010,7 @@ def fetch_marketable(session):
 
 
 def fetch_prices(ids, scope, session, chunk=50, listings=50, entries=50,
-                 attempts=3):
+                 attempts=3, retry_single_items=None, notes=None):
     # Batches of 100 reliably 504 under current Universalis load; 50 comes
     # back in a few seconds *for a single-world scope*. A DC/cross-world
     # scope aggregates every world in it and is measurably heavier. The
@@ -1047,38 +1047,46 @@ def fetch_prices(ids, scope, session, chunk=50, listings=50, entries=50,
     # ~9.5s/batch for a single-world scope, well inside the timeout below.
     out = {}
     ids = sorted(set(i for i in ids if i))
-    absent = set()          # 404s: Universalis has no such item, ever
+    absent = set()          # Single-item 404s: no record in this scope.
 
-    def fetch_batch(batch, tries, quiet=False):
+    def note(message):
+        print(f"  ! {message}", file=sys.stderr)
+        if notes is not None:
+            notes.append(message)
+
+    def fetch_batch(batch, tries):
         """Fetch one batch into `out`. Returns True if it landed."""
         url = (f"{UNIVERSALIS}/{scope}/{','.join(str(b) for b in batch)}"
                f"?listings={listings}&entries={entries}")
         for attempt in range(1, tries + 1):
             try:
                 r = session.get(url, timeout=90)
-                # A 404 means Universalis has no record of the item at all
-                # (untradable, or not in its database). That is a permanent
-                # answer, not a timeout - retrying it just burns the budget
-                # that the recoverable failures need.
+                # A batch 404 cannot establish absence for every member.
+                # Neither kind of 404 proves the item is untradeable.
                 if r.status_code == 404:
-                    absent.update(batch)
+                    if len(batch) == 1:
+                        absent.update(batch)
                     return False
                 r.raise_for_status()
                 data = r.json()
+                if not isinstance(data, dict):
+                    raise ValueError("expected a pricing object")
+                items = data.get("items")
+                if not isinstance(items, dict):
+                    items = {str(data["itemID"]): data} if data.get("itemID") else {}
+                # Missing/malformed entries remain eligible for an approved
+                # retry; only requested IDs with usable object shapes count.
+                parsed = {iid: items[str(iid)] for iid in batch
+                          if isinstance(items.get(str(iid)), dict)
+                          and items[str(iid)]}
             except Exception as e:
                 if attempt == tries:
-                    if not quiet:
-                        print(f"  ! pricing batch failed ({e}); continuing",
-                              file=sys.stderr)
+                    print(f"  ! pricing batch failed ({e}); continuing",
+                          file=sys.stderr)
                     return False
                 time.sleep(1.5 * attempt)
                 continue
-            items = data.get("items")
-            if isinstance(items, dict):
-                for k, v in items.items():
-                    out[int(k)] = v
-            elif data.get("itemID"):
-                out[int(data["itemID"])] = data
+            out.update(parsed)
             return True
         return False
 
@@ -1087,28 +1095,39 @@ def fetch_prices(ids, scope, session, chunk=50, listings=50, entries=50,
             time.sleep(1.0)
         time.sleep(0.3)
 
-    # Sweep. Per-item aggregation cost varies enormously - measured against
-    # In a data-center benchmark, single items ranged 0.18s to 7.8s - so one slow
-    # item times out the whole batch it happens to share, taking its
-    # neighbours down with it. Those neighbours are recoverable: refetch
-    # what is still missing one id at a time, where nothing else is
-    # competing for the same 10s budget. This is why a run is slow rather
-    # than incomplete, which is the trade we want.
-    for round_no in (1, 2):
-        missing = [i for i in ids if i not in out and i not in absent]
-        if not missing:
-            break
-        print(f"  sweeping {len(missing)} unpriced item(s), pass {round_no}...",
-              file=sys.stderr)
-        for iid in missing:
-            fetch_batch([iid], attempts, quiet=(round_no == 1))
-            time.sleep(0.2)
+    # A slow item can time out its neighbours. Single-item requests can
+    # recover them, but potentially add many requests: ask before that work.
+    missing = [i for i in ids if i not in out and i not in absent]
+    if missing and chunk > 1:
+        approved = retry_single_items
+        if approved is None and sys.stdin.isatty():
+            print(f"{scope}: {len(missing)}/{len(ids)} item(s) have no pricing. "
+                  "Retry missing prices in batches of 1? [y/N] ",
+                  end="", file=sys.stderr, flush=True)
+            try:
+                approved = input().strip().lower() in ("y", "yes")
+            except EOFError:
+                approved = False
+        if approved:
+            print(f"  retrying {len(missing)} unpriced item(s) in {scope}, "
+                  "batch size 1...",
+                  file=sys.stderr)
+            for iid in missing:
+                fetch_batch([iid], attempts)
+                time.sleep(0.2)
+        elif approved is None:
+            note(f"{scope}: smaller-batch pricing retry not performed. "
+                 "Ask the user whether to retry with batch size 1; after approval, "
+                 "use --retry-pricing-single-items or --pricing-batch-size 1.")
+        else:
+            note(f"{scope}: smaller-batch pricing retry not approved; "
+                 "available results retained.")
 
     still = [i for i in ids if i not in out and i not in absent]
     if still:
-        print(f"  ! {len(still)} item(s) never priced after sweeps: "
-              f"{still[:10]}{'...' if len(still) > 10 else ''}",
-              file=sys.stderr)
+        note(f"{scope}: {len(still)}/{len(ids)} item(s) remain unpriced: "
+             f"{still[:10]}{'...' if len(still) > 10 else ''}. "
+             "Missing prices do not establish market prohibition or zero value.")
     return out
 
 
@@ -2042,6 +2061,10 @@ def main():
                     help="skip achievements and collections")
     ap.add_argument("--no-retainers", action="store_true")
     ap.add_argument("--no-pricing", action="store_true")
+    ap.add_argument("--pricing-batch-size", type=int, metavar="N",
+                    help="items per request in both pricing scopes (default: World 50, DC 4)")
+    ap.add_argument("--retry-pricing-single-items", action="store_true", default=None,
+                    help="authorize one retry pass of missing prices with batch size 1")
     ap.add_argument("--min-gil", type=int, default=1000)
     ap.add_argument("--refresh-items", action="store_true")
     ap.add_argument("--quest-pages", type=int, default=1)
@@ -2059,6 +2082,8 @@ def main():
                     help="don't apply quest-material protection even if "
                          "--quest-mats resolves to a real file")
     args = ap.parse_args()
+    if args.pricing_batch_size is not None and args.pricing_batch_size < 1:
+        ap.error("--pricing-batch-size must be at least 1")
 
     try:
         args.mode = resolve_mode(args.mode, args.config,
@@ -2272,14 +2297,22 @@ def main():
                         f"{MIN_GIL_NUISANCE_FLOOR:,}g - not worth listing "
                         "regardless of slot pressure).")
                 marketable = fetch_marketable(session)
-                ids = sorted({r["item_id"] for r in rows if r["item_id"]})
                 if marketable is None:
                     notes.append("Universalis marketable list unavailable; "
-                                 "trying all resolved IDs. Missing prices do "
+                                 "trying resolved IDs without a known market prohibition. Missing prices do "
                                  "not establish that an item is untradeable.")
-                pricing_ids = [iid for iid in ids
-                               if marketable is None or iid in marketable]
-                world_px = fetch_prices(pricing_ids, args.world, session)
+                # Tooltip market flags and vendor sale values are already
+                # available. Vendor-only items need no remote market pricing;
+                # vendor-unsellable items may still be marketable. Preserve
+                # unknown eligibility rather than interpreting it as blocked.
+                pricing_ids = sorted({r["item_id"] for r in rows
+                                      if r["item_id"]
+                                      and r.get("market_allowed") is not False
+                                      and (marketable is None or r["item_id"] in marketable)})
+                world_px = fetch_prices(
+                    pricing_ids, args.world, session,
+                    chunk=args.pricing_batch_size or 50,
+                    retry_single_items=args.retry_pricing_single_items, notes=notes)
                 # DC scope aggregates every world in the DC and is much
                 # more prone to 504s under load than a single-world query
                 # at the same size (confirmed live, 2026-08-28) - smaller
@@ -2291,8 +2324,10 @@ def main():
                 # 1.6s at 50 vs 2.1s at 20 on 2026-09-09) - the timeout is
                 # driven by per-item aggregation, not response size. More
                 # history means better medians, so take it.
-                dc_px = fetch_prices(pricing_ids, args.dc, session, chunk=4,
-                                     listings=50, entries=50, attempts=3)
+                dc_px = fetch_prices(
+                    pricing_ids, args.dc, session, chunk=args.pricing_batch_size or 4,
+                    listings=50, entries=50, attempts=3,
+                    retry_single_items=args.retry_pricing_single_items, notes=notes)
                 if pricing_ids and len(dc_px) < 0.5 * len(pricing_ids):
                     notes.append(
                         f"DC pricing ({args.dc}) only resolved for "
@@ -2328,7 +2363,7 @@ def main():
                             candidates.append(iid)
                     print("checking NPC vendor ceilings...", file=sys.stderr)
                     vendor_buy = fetch_vendor_buy_prices(
-                        ids, session, candidates=candidates)
+                        pricing_ids, session, candidates=candidates)
                     for r in rows:
                         r.update(verdict_for(r, world_px, dc_px, marketable,
                                              effective_min_gil, args.world,
