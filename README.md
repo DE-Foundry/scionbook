@@ -275,7 +275,7 @@ procedure. Direct helpers do not reconcile prose reports, install a complete val
 For an independent full-mode development fetch, create `.scionbook-tmp/` first and run:
 
 ```bash
-python3 scionbook_report.py --cookie-env --quest-pages 100 --recent-quests 0 --out .scionbook-tmp/status.json --report .scionbook-tmp/cleanup.md --quest-mats-out .scionbook-tmp/quest_mats.json
+python3 scionbook_report.py --cookie-env --no-retry-pricing-single-items --quest-pages 100 --recent-quests 0 --out .scionbook-tmp/status.json --report .scionbook-tmp/cleanup.md --quest-mats-out .scionbook-tmp/quest_mats.json
 python3 scionbook_quest_history.py --from-status --status .scionbook-tmp/status.json --out .scionbook-tmp/quest_history.md
 ```
 
@@ -293,7 +293,32 @@ written only when a version 2 plan successfully reconciles; never install a left
 total. The history renderer refuses incomplete data and preserves its previous output. Additional flags:
 `--fast` skips achievements/collections, `--no-pricing` keeps unpriced inventory unknown, `--refresh-items`
 refreshes the shared item-name cache, and `--dump raw --probe` captures diagnostic HTML locally.
+Pricing uses batches of 50 items for the home World and 4 for the DC. `--pricing-batch-size N`
+overrides both (minimum 1). After failed or partial batches, an interactive run asks before retrying
+missing items in batches of 1, sharing one answer across the home World and DC. Use
+`--no-retry-pricing-single-items` to decline retries and disable terminal prompts, including in agent
+shells with a terminal attached. When unset without a terminal, notes identify pending consent for the
+Maintainer to ask in chat. After approval, `--retry-pricing-single-items` authorizes one recovery pass;
+each request retains its bounded retries. No or silence preserves available prices and vendor values,
+with gaps disclosed. Starting with batch size 1 does not trigger a smaller retry. Singleton failures
+produce a summary rather than a warning for every failed item.
 The report is always rewritten when `--report` is supplied, including when no inventory report exists.
+
+An approved retry can reuse the staged snapshot without scraping the character again:
+
+```bash
+python3 scionbook_report.py --pricing-only-from .scionbook-tmp/status.json --retry-pricing-single-items --out .scionbook-tmp/status-priced.json --report .scionbook-tmp/cleanup-priced.md
+```
+
+Pricing-only recovery requests missing IDs in each scope, keeps successful prices, and rebuilds verdicts,
+totals, sales calibration, and the cleanup report from saved inputs and material protections. It requires
+an explicit approval flag and a separate output snapshot. It does not need a cookie or fetch Lodestone,
+reload the item index, or write quest history/crafting files. Character `fetched_at_utc` stays unchanged;
+`pricing_recovery_at_utc` records the recovery attempt. Validate the recovered snapshot/report together
+with the original staged history/protection before installation. Retained prices keep their original
+source data. Older snapshots without the optional `pricing_context` remain readable, but cannot support
+this mode; obtain recovery context at the next separately requested full sync. Running the full scraper
+with only `--retry-pricing-single-items` still rescrapes the entire character.
 
 The snapshot includes jobs, equipped-job gear attribution, quests, currencies/reputation, collections,
 retainer inventory/listings/sales/ventures, pricing verdicts, and run-specific availability notes. Missing
@@ -304,9 +329,12 @@ Inventory and current listings are disjoint; recent sales are already gone. Mark
 retainer. Realistic proceeds are constrained by sale depth, not simply price multiplied by all stock.
 Treat unresolved items and missing pricing evidence as unknown in cleanup advice; lack of a market price
 is not proof that an item is worthless. Known market-prohibited items may still have vendor value. The
-scraper filters pricing requests by Universalis marketability and warns if the marketability list is
-unavailable. Selling proceeds and liquidity estimates use the configured home World only. When its price
-is missing, a usable DC price is labeled **Non-home-World price**, with its source and unit price. You can
+scraper checks tooltip market eligibility and vendor sale values before pricing, then filters market
+requests by Universalis marketability. Market-prohibited items skip market pricing, including when the
+catalog is unavailable; known vendor values remain usable. Vendor-unsellable items can still be marketable.
+Unknown eligibility is disclosed and does not establish a prohibition. Selling proceeds and liquidity
+estimates use the configured home World only. When its price is missing, a usable DC price is labeled
+**Non-home-World price**, with its source and unit price. You can
 use it as a provisional starting listing price on your home World; local proceeds and sale speed remain
 unestimated. If neither scope has a usable price, the item remains unknown. Other Worlds/DCs are never
 selling destinations. Existing saved reports retain their old output until the next explicitly requested sync.

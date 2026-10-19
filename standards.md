@@ -68,6 +68,17 @@ local sale speed from it, or recommend the source World/DC as a selling destinat
 Missing market prices do not erase a known vendor sale value. Compare provisional DC references against
 vendor proceeds too; any resulting proceeds estimate is vendor-only. NPC purchase prices trigger a warning
 for either price source, never an automatic cap, because shop access may be gated.
+Check known market eligibility and vendor sale values before market pricing. Exclude market-prohibited
+items from price requests even when the global marketable catalog is unavailable; a missing vendor
+value alone does not establish market prohibition. After failed or partial pricing batches, ask before
+retrying missing items with a smaller batch size (1 item). Noninteractive runs must expose the question
+for the Maintainer to ask; no or silence does not authorize singleton recovery. Bound approved recovery
+and preserve successful prices, known vendor values, and disclosed unknowns.
+Share retry consent across home-World/DC requests and support an explicit CLI decline that suppresses
+terminal prompts. Agent sync commands decline scraper prompts and handle consent in chat. Recover only
+missing prices from saved snapshot context after approval, preserving the character source timestamp,
+successful prices, and saved material protections; record pricing recovery time separately. Do not
+rescrape Lodestone or reconcile crafting/history merely to recover pricing. Summarize singleton failures.
 
 ## Credentials and output
 

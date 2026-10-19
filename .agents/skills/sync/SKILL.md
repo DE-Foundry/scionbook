@@ -28,10 +28,31 @@ Finish the validation and reconciliation below before installing or offering the
   not erase its private history; retain it as explicitly historical, not fresh.
 
 Full command:
-`python3 scionbook_report.py --cookie-env --refresh-items --quest-pages 100 --recent-quests 0 --quest-mats-out .scionbook-tmp/quest_mats.json --out .scionbook-tmp/status.json --report .scionbook-tmp/cleanup.md`
+`python3 scionbook_report.py --cookie-env --no-retry-pricing-single-items --refresh-items --quest-pages 100 --recent-quests 0 --quest-mats-out .scionbook-tmp/quest_mats.json --out .scionbook-tmp/status.json --report .scionbook-tmp/cleanup.md`
 
 Public command:
 `python3 scionbook_report.py --anon --no-retainers --out .scionbook-tmp/status.json --report .scionbook-tmp/cleanup.md`
+
+Pricing checks tooltip market eligibility and vendor sale values before requesting market prices;
+market-prohibited items need no market lookup, and missing vendor value alone does not prohibit listing.
+If pricing still fails or returns partial batches, ask whether to retry missing prices with batch size 1.
+The full command disables scraper prompts even if the shell has a terminal attached; inspect the notes
+and ask in chat unless the user has already approved or declined. No or silence means retain available
+results and disclose gaps. An interactive user-run scraper asks once and reuses the answer for both scopes.
+Reuse approval already given for that retry. After Yes, recover from the staged snapshot:
+
+`python3 scionbook_report.py --pricing-only-from .scionbook-tmp/status.json --retry-pricing-single-items --out .scionbook-tmp/status-priced.json --report .scionbook-tmp/cleanup-priced.md`
+
+This performs one bounded singleton pass for missing IDs in each scope, retaining successful prices.
+It requires no cookie and does not rescrape Lodestone, load the item index, reconcile crafting data, or
+rewrite quest history/protection files. It rebuilds verdicts, totals, calibration, and the cleanup report
+using the saved eligibility and material protections. Validate identity, matching recovery context,
+unchanged character fetched_at_utc, separate pricing_recovery_at_utc, and snapshot/report agreement.
+Use the recovered snapshot/report for the remaining validation/install steps below, paired with the
+original staged history and crafting protection: their source timestamp remains unchanged. Retain the
+previous staged pair until replacement is complete. If prices still fail, disclose the gaps and stop;
+do not loop or treat pricing failures as credential failures. Older snapshots without recovery context
+cannot use this mode; a full re-scrape needs a separate explicit refresh request.
 
 Before replacing anything, verify configured character ID/name/home world/data center, actual fresh
 fetched_at_utc, parsed profile and jobs, notes, and still_not_available. A cookie-presence authenticated flag
