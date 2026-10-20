@@ -79,6 +79,9 @@ terminal prompts. Agent sync commands decline scraper prompts and handle consent
 missing prices from saved snapshot context after approval, preserving the character source timestamp,
 successful prices, and saved material protections; record pricing recovery time separately. Do not
 rescrape Lodestone or reconcile crafting/history merely to recover pricing. Summarize singleton failures.
+Persist only numeric valuation inputs and HQ/unit-price samples from market responses, excluding
+third-party names/IDs and unused metadata. Trim existing raw recovery contexts when writing recovered
+outputs, and keep duplicated inventory inputs limited to verdict/protection/report fields.
 
 ## Credentials and output
 

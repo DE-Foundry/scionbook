@@ -1861,7 +1861,8 @@ def build_report(data):
              "provisional home-World listing prices, never selling destinations.", ""]
     if data.get("pricing_recovery_at_utc"):
         lines.extend([f"Pricing recovery attempted {data['pricing_recovery_at_utc']}. "
-                      "Character data and retained prices keep their original source times.", ""])
+                      "Character data keeps its original source time; retained price inputs "
+                      "are not refreshed.", ""])
     buckets = {}
     for r in data.get("all_rows", []):
         buckets.setdefault(r["verdict"], []).append(r)
@@ -2058,9 +2059,11 @@ def pricing_coverage_notes(ids, world_px, dc_px, dc):
             "likely Universalis load on the cross-world endpoint - comparison "
             "data is incomplete; home-World selling estimates are unaffected.")
     if ids and not world_px and not dc_px:
-        notes.append("Universalis returned no data for any item. Market estimates "
-                     "unavailable; only known vendor values are retained. Missing "
-                     "prices are not evidence to discard.")
+        message = ("Universalis returned no data for any item. Market estimates "
+                   "unavailable; only known vendor values are retained. Missing "
+                   "prices are not evidence to discard. Check connectivity and re-run.")
+        notes.append(message)
+        print(message, file=sys.stderr)
     return notes
 
 
@@ -2077,6 +2080,36 @@ def vendor_candidates(rows, world_px, dc_px):
     return sorted(candidates)
 
 
+def saved_price_inputs(prices):
+    """Keep only numeric pricing inputs and HQ/price samples, never identities."""
+    numeric_fields = tuple(stem + suffix
+                           for stem in ("averagePrice", "currentAveragePrice", "minPrice")
+                           for suffix in ("", "NQ", "HQ")) + (
+                               "listingsCount", "nqSaleVelocity", "hqSaleVelocity",
+                               "regularSaleVelocity")
+    out = {}
+    for iid, entry in prices.items():
+        if not isinstance(entry, dict):
+            raise ValueError("Invalid saved pricing entry.")
+        kept = {key: entry[key] for key in numeric_fields
+                if type(entry.get(key)) in (int, float)}
+        for key in ("listings", "recentHistory"):
+            if isinstance(entry.get(key), list):
+                kept[key] = [
+                    {field: value for field, value in sample.items()
+                     if (field == "hq" and type(value) is bool)
+                     or (field == "pricePerUnit" and type(value) in (int, float))}
+                    for sample in entry[key] if isinstance(sample, dict)]
+        out[iid] = kept
+    return out
+
+
+def saved_inventory_inputs(rows):
+    """Inputs needed for verdicts, protections, and report grouping."""
+    fields = ("name", "item_id", "quantity", "hq", "vendor_price", "market_allowed", "retainer")
+    return [{key: row[key] for key in fields if key in row} for row in rows]
+
+
 def recover_pricing(args):
     """Recover only missing prices; never authenticate or refresh player sources."""
     data = parse_json(pathlib.Path(args.pricing_only_from).read_text(encoding="utf-8"))
@@ -2090,11 +2123,11 @@ def recover_pricing(args):
             or context.get("source_fetched_at_utc") != data.get("fetched_at_utc")):
         raise ValueError("Snapshot has no matching pricing recovery context. "
                          "Use a snapshot from a separately authorized full sync with this version.")
-    rows = [dict(row) for row in context["input_rows"]]
+    rows = saved_inventory_inputs(context["input_rows"])
     marketable = context["marketable"]
     marketable = None if marketable is None else set(marketable)
     ids = context["pricing_ids"]
-    prices = [{int(key): value for key, value in context[name].items()}
+    prices = [saved_price_inputs({int(key): value for key, value in context[name].items()})
               for name in ("world_prices", "dc_prices")]
     absent = [set(context[name]) for name in ("world_absent", "dc_absent")]
     vendor_buy = {int(key): value for key, value in context["vendor_buy"].items()}
@@ -2133,7 +2166,8 @@ def recover_pricing(args):
     # Only replace notes owned by the pricing pass. Private-page/protection
     # findings remain attributed to the original character fetch.
     data["notes"] = [note for note in data.get("notes", []) if note not in previous_notes] + notes
-    context.update(world_prices=world_px, dc_prices=dc_px, vendor_buy=vendor_buy,
+    context.update(world_prices=saved_price_inputs(world_px), dc_prices=saved_price_inputs(dc_px),
+                   input_rows=saved_inventory_inputs(rows), vendor_buy=vendor_buy,
                    world_absent=sorted(absent[0]), dc_absent=sorted(absent[1]), notes=notes)
     data["pricing_recovery_at_utc"] = datetime.now(timezone.utc).isoformat()
     calibration = calibrate_against_sales(data["retainers"], world_px, by_name)
@@ -2476,7 +2510,7 @@ def main():
                              est_value=None)
             else:
                 print("pricing against Universalis...", file=sys.stderr)
-                input_rows = [dict(row) for row in rows]
+                input_rows = saved_inventory_inputs(rows)
                 pricing_notes = []
                 # min_gil is a floor worth having when slots are contested -
                 # with 40/40 full, a 940g item genuinely isn't worth bumping
@@ -2569,7 +2603,8 @@ def main():
                     "input_rows": input_rows, "pricing_ids": pricing_ids,
                     "marketable": (None if marketable is None else sorted({
                         row["item_id"] for row in rows if row.get("item_id") in marketable})),
-                    "world_prices": world_px, "dc_prices": dc_px,
+                    "world_prices": saved_price_inputs(world_px),
+                    "dc_prices": saved_price_inputs(dc_px),
                     "world_absent": sorted(world_absent), "dc_absent": sorted(dc_absent),
                     "vendor_buy": vendor_buy, "effective_min_gil": effective_min_gil,
                     "by_name": {name: by_name[name] for name in names if name in by_name},

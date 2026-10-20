@@ -65,7 +65,7 @@ def run_report(monkeypatch, tmp_path):
         monkeypatch.setattr(report, 'scrape_retainer', lambda *a, **k: {
             'retainer_id': 'example', 'inventory': [
                 {'name': f'Item {i}', 'quantity': 1, 'hq': False,
-                 'vendor_price': vendor_price, 'market_allowed': market_allowed}
+                 'vendor_price': vendor_price, 'market_allowed': market_allowed, 'listed_price': None}
                 for i in ids], 'market_listings': [], 'recent_sales': []})
         output = tmp_path / 'status.json'
         monkeypatch.setattr(sys, 'argv', ['scionbook_report.py', '--id', '12345',
@@ -173,6 +173,115 @@ def recovery_args(source, output, *flags):
     return ['scionbook_report.py', '--id', '12345', '--world', 'Example World',
             '--dc', 'Example DC', '--pricing-only-from', str(source),
             '--out', str(output), *flags]
+
+
+def rich_price_entry():
+    """Synthetic full-depth responses, including unused third-party metadata."""
+    entry = {stem + suffix: price for stem in ('averagePrice', 'currentAveragePrice', 'minPrice')
+             for suffix, price in (('', 800), ('NQ', 500), ('HQ', 900))}
+    entry.update(itemID=1, nqSaleVelocity=20, hqSaleVelocity=2, regularSaleVelocity=10,
+                 listingsCount=100, lastUploadTime=1770000000,
+                 worldName='Example World', worldID=123)
+    entry['listings'] = [
+        {'hq': bool(i % 2), 'pricePerUnit': 600 + i, 'quantity': i + 1,
+         'lastReviewTime': 1770000000 + i,
+         'retainerName': 'Synthetic market retainer', 'sellerID': 'synthetic-seller-id',
+         'creatorID': 'synthetic-creator-id', 'retainerID': 'synthetic-retainer-id',
+         'materia': [], 'onMannequin': False}
+        for i in range(50)]
+    entry['recentHistory'] = [
+        {'hq': bool(i % 2), 'pricePerUnit': 500 + i, 'quantity': i + 1,
+         'timestamp': 1770000000 + i, 'buyerName': 'Synthetic market buyer',
+         'worldName': 'Example World', 'worldID': 123}
+        for i in range(50)]
+    return entry
+
+
+def test_saved_pricing_context_trims_metadata_on_full_sync_and_recovery(
+        run_report, monkeypatch, tmp_path):
+    get = PricingSession.get
+    def with_metadata(session, url, **kwargs):
+        result = get(session, url, **kwargs)
+        payload = result.json()
+        if isinstance(payload, dict):
+            for entry in payload.get('items', {}).values():
+                entry.update(rich_price_entry())
+        return result
+    monkeypatch.setattr(PricingSession, 'get', with_metadata)
+    _, before = run_report([1, 2], ids=(1, 2), available=(1,),
+                           pricing_args=['--no-retry-pricing-single-items'])
+    for scope in ('world_prices', 'dc_prices'):
+        kept = before['pricing_context'][scope]['1']
+        assert len(kept['listings']) == len(kept['recentHistory']) == 50
+        assert len(json.dumps(kept)) < len(json.dumps(rich_price_entry())) / 3
+    assert 'listed_price' not in before['pricing_context']['input_rows'][0]
+    forbidden = ('retainerName', 'sellerID', 'buyerName', 'creatorID', 'retainerID')
+    assert all(field not in json.dumps(before) for field in forbidden)
+
+    # Previously produced raw contexts must be sanitized too; retain source bytes.
+    for scope in ('world_prices', 'dc_prices'):
+        before['pricing_context'][scope]['1'] = rich_price_entry()
+    before['pricing_context']['input_rows'][0].update(listed_price=0, unused='discard this')
+    source, output = tmp_path / 'status.json', tmp_path / 'status-priced.json'
+    source.write_text(json.dumps(before))
+    original = source.read_bytes()
+    session = PricingSession([1, 2], available=(1, 2))
+    monkeypatch.setattr(report.requests, 'Session', lambda: session)
+    monkeypatch.setattr(sys, 'argv', recovery_args(source, output, '--retry-pricing-single-items'))
+    report.main()
+    after = json.loads(output.read_text())
+    assert source.read_bytes() == original
+    assert len(session.calls) == 2  # only missing ID 2, in each scope
+    assert all(urlsplit(url).path.endswith('/2') for url in session.calls)
+    assert all(field not in output.read_text() for field in forbidden)
+    assert 'unused' not in after['pricing_context']['input_rows'][0]
+    assert 'listed_price' not in after['pricing_context']['input_rows'][0]
+    for scope in ('world_prices', 'dc_prices'):
+        assert after['pricing_context'][scope]['1'] == after['pricing_context'][scope]['2']
+    assert after['all_rows'][0]['verdict'] == before['all_rows'][0]['verdict']
+    assert after['all_rows'][0]['est_value'] == before['all_rows'][0]['est_value']
+
+
+@pytest.mark.parametrize('hq', [False, True])
+@pytest.mark.parametrize('listing_window', [False, True])
+@pytest.mark.parametrize('source', ['history_median', 'average_price', 'current_average_price',
+                                    'min_price', 'generic_fallback', 'generic_current',
+                                    'generic_min', None])
+def test_saved_price_inputs_preserve_verdicts_and_calibration(hq, listing_window, source):
+    entry = rich_price_entry()
+    if not listing_window:
+        entry.pop('listings')
+    suffix = 'HQ' if hq else 'NQ'
+    if source != 'history_median':
+        entry.pop('recentHistory')
+    if source not in ('history_median', 'average_price'):
+        entry.pop('averagePrice' + suffix)
+    if source not in ('history_median', 'average_price', 'current_average_price'):
+        entry.pop('currentAveragePrice' + suffix)
+    if source in ('generic_fallback', 'generic_current', 'generic_min', None):
+        entry.pop('minPrice' + suffix)
+    if source in ('generic_current', 'generic_min'):
+        entry.pop('averagePrice')
+    if source == 'generic_min':
+        entry.pop('currentAveragePrice')
+    if source is None:
+        for key in ('averagePrice', 'currentAveragePrice', 'minPrice'):
+            entry.pop(key)
+    raw, kept = {1: entry}, report.saved_price_inputs({1: entry})
+    expected_source = 'generic_fallback' if source in ('generic_current', 'generic_min') else source
+    assert report.pick_unit_price(kept[1], hq)[1] == expected_source
+    row = {'name': 'Item 1', 'item_id': 1, 'quantity': 99, 'hq': hq, 'vendor_price': 10}
+    assert report.verdict_for(row, kept, kept, {1}, 100, 'Home', 'DC') == report.verdict_for(
+        row, raw, raw, {1}, 100, 'Home', 'DC')
+    retainers = [{'recent_sales': [{'name': 'Item 1', 'unit_price': 500, 'hq': hq}]}]
+    assert report.calibrate_against_sales(retainers, kept, {'item 1': 1}) == report.calibrate_against_sales(
+        retainers, raw, {'item 1': 1})
+
+
+def test_saved_price_inputs_drop_nonscalar_values_even_under_known_keys():
+    raw = {1: {'averagePriceNQ': {'sellerID': 'synthetic'}, 'minPriceHQ': 'synthetic',
+               'listings': [{'hq': True, 'pricePerUnit': {'buyerName': 'synthetic'}}]}}
+    assert report.saved_price_inputs(raw) == {1: {'listings': [{'hq': True}]}}
 
 
 def test_pricing_only_recovers_missing_ids_without_lodestone_or_credentials(
@@ -410,6 +519,14 @@ def test_total_pricing_outage_preserves_vendor_proceeds(run_report, catalog):
     # The report aggregate covers market sales, not vendor proceeds.
     assert data['summary']['estimated_recoverable_gil'] == 0
     assert data['summary']['market_slots_planned'] == 0
+
+
+def test_total_pricing_outage_prints_connectivity_guidance(run_report, capsys):
+    _, data = run_report([1], ids=(1,), available=(),
+                         pricing_args=['--no-retry-pricing-single-items'])
+    note = next(note for note in data['notes'] if 'Universalis returned no data' in note)
+    assert note.endswith('Check connectivity and re-run.')
+    assert note in capsys.readouterr().err
 
 
 def test_dc_only_reference_is_checked_for_npc_shop_warning(run_report, monkeypatch):

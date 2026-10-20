@@ -315,8 +315,12 @@ totals, sales calibration, and the cleanup report from saved inputs and material
 an explicit approval flag and a separate output snapshot. It does not need a cookie or fetch Lodestone,
 reload the item index, or write quest history/crafting files. Character `fetched_at_utc` stays unchanged;
 `pricing_recovery_at_utc` records the recovery attempt. Validate the recovered snapshot/report together
-with the original staged history/protection before installation. Retained prices keep their original
-source data. Older snapshots without the optional `pricing_context` remain readable, but cannot support
+with the original staged history/protection before installation. Retained prices keep only the parsed
+numeric inputs used for valuation: fallback prices, velocities, listing counts, and HQ/unit-price
+samples. Third-party names/IDs and unused response metadata are not saved. Recovery also trims older
+raw contexts in its output, leaving the source file untouched. Inventory recovery rows contain only
+the fields needed for verdicts, protections, and report grouping.
+Older snapshots without the optional `pricing_context` remain readable, but cannot support
 this mode; obtain recovery context at the next separately requested full sync. Running the full scraper
 with only `--retry-pricing-single-items` still rescrapes the entire character.
 

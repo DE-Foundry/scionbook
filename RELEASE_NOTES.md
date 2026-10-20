@@ -8,6 +8,9 @@ readable without migration, but pricing-only recovery requires context from a se
 sync. Recovery preserves the character timestamp and saved protections and records its attempt time
 separately. Keep the original staged snapshot/report and matching history/protection until the recovered
 pair is validated; rollback uses that original set. See the README for commands and installation steps.
+Saved recovery prices contain only numeric valuation inputs and HQ/unit-price samples, excluding
+third-party names/IDs and unused metadata. Recovery trims earlier raw contexts in its output without
+modifying the source snapshot; the context version remains compatible.
 
 Automated CLI recap handoffs now ask the model for proposed changes. Python validates permitted player
 files and preference fields, installs them, and verifies saved bytes before opening the next chat.
