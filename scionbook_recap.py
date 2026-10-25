@@ -125,6 +125,11 @@ def validate(proposal, original):
             if ({k: v for k, v in before.items() if k != "preferences"}
                     != {k: v for k, v in after.items() if k != "preferences"}):
                 raise ValueError("Recaps may change preferences only, never character configuration.")
+        # Text reads normalize Windows CRLF. Preserve original bytes when the
+        # proposal differs only in newline encoding, so replay remains a no-op.
+        if (original[name] is not None
+                and data.replace(b"\r\n", b"\n") == original[name].replace(b"\r\n", b"\n")):
+            data = original[name]
         changes[name] = data
     return changes
 
