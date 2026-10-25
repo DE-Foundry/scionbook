@@ -9,8 +9,8 @@ Load and apply saved preferences using [gameplay preference rules](../../../docs
 
 Follow AGENTS.md and shared source/freshness rules. Analyze in either role without changing permissions.
 Read configured home world/data center, preferences, status.json timestamp/warnings/gaps, market_listings,
-recent_sales, all_rows, and newer reports. If holdings/listings are stale or unavailable, request Maintainer
-sync before a precise plan. A public price lookup does not refresh the player's inventory or balances.
+recent_sales, all_rows, and newer reports. If holdings/listings are stale or unavailable, offer an explicitly requested
+sync here before a precise plan. A public price lookup does not refresh the player's inventory or balances.
 Retainers list and sell only on the character's home World from scionbook.json. State that World in the
 plan and prefer its market for selling prices and expected returns. If local pricing is missing but a
 non_home_world_price reference exists, show “Non-home-World price,” its source World/DC, quality, and
@@ -45,4 +45,6 @@ listing slots, and leave local proceeds/sale speed unestimated. Other Worlds/DCs
 
 Start with a concise update and highest-value changes. Distinguish conservative proceeds from optimistic
 full-stock totals. Stop on missing identity, holdings, or pricing evidence rather than recommending guessed
-transactions. No in-game actions, automatic refresh, credential requests, repository writes, or implied completions.
+transactions. No in-game actions, automatic refresh, credential requests, shared-source changes, or implied completions.
+Clear preferences and confirmed reports use [save-state](../save-state/SKILL.md) immediately;
+recommendations alone never establish completed listings, sales, or moves.

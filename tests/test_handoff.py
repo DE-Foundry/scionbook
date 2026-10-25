@@ -174,7 +174,7 @@ def test_launch_failure_is_reported(monkeypatch):
 
 
 @pytest.mark.parametrize("role,sandbox,approval,skill", [
-    ("session", "read-only", "never", "$start-session"),
+    ("session", "workspace-write", "on-request", "$start-session"),
     ("maintainer", "workspace-write", "on-request", "$start-maintenance"),
 ])
 @pytest.mark.skipif(os.name == "nt", reason="Bash adapters are supported on Linux/macOS")
@@ -204,16 +204,16 @@ def fake_claude(tmp_path):
 
 
 @pytest.mark.skipif(os.name == "nt", reason="Bash adapters are supported on Linux/macOS")
-def test_claude_session_launcher_is_read_only(tmp_path):
+def test_claude_session_launcher_keeps_normal_write_controls(tmp_path):
     result = subprocess.run(["bash", str(handoff.REPO / "scripts" / "scionbook-chat"), "session"],
                             env=fake_claude(tmp_path), text=True, capture_output=True, check=True)
     cwd, memory, *args = result.stdout.splitlines()
     assert cwd == str(handoff.REPO) and memory == "1"
-    assert args[args.index("--permission-mode") + 1] == "dontAsk"
+    assert "--permission-mode" not in args
+    assert "--dangerously-skip-permissions" not in args
     denied = args[args.index("--disallowedTools") + 1:args.index("--")]
-    assert {"Bash", "Edit", "Write", "NotebookEdit", "Agent"} <= set(denied)
-    allowed = args[args.index("--allowedTools") + 1:args.index("--disallowedTools")]
-    assert not {"Bash", "Edit", "Write"} & set(allowed)
+    assert denied == ["Agent"]
+    assert "--allowedTools" not in args
     assert "start-session" in args[-1] and "Session Planner" in args[-1]
     assert not any(value in args for value in ("--resume", "--continue", "-c", "-r"))
 
@@ -299,7 +299,7 @@ def test_app_draft_encodes_exact_workspace_and_skill_without_launch(tmp_path, mo
     prompt = params['prompt'][0]
     if role == 'apply':
         assert prompt.startswith('Use $apply-recap from .agents/skills/apply-recap/SKILL.md.')
-        assert 'After verifying' in prompt and '$start-maintenance' in prompt
+        assert 'verify the local save' in prompt and '$start-maintenance' not in prompt
         assert 'missing' in prompt and 'fails' in prompt
         assert prompt.endswith('Recap to apply:\n')
     else:

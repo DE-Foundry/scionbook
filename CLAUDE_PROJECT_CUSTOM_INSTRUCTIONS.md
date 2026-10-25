@@ -1,7 +1,7 @@
 # Scionbook project instructions
 
-Follow AGENTS.md, standards.md, and SCIONBOOK_INSTRUCTIONS.md in this repository.
-Use the role-specific and specialist workflows in .agents/skills/. Personal configuration is in
-scionbook.json; local state is initialized by the setup skill. Never embed player state in this file.
-`$skill` is Codex syntax; Claude Code uses `/skill`. Otherwise read the corresponding SKILL.md and follow it.
-Keep Session Planner read-only and Repository Maintainer in a separate chat with write permissions.
+Follow AGENTS.md, standards.md, and SCIONBOOK_INSTRUCTIONS.md. Read workflows from .agents/skills/.
+Use one ongoing player conversation with local write access. Clear preferences and confirmed reports
+save immediately to ignored local files; exploratory discussion stays distinct. Sync remains explicitly
+requested. Never embed player identity, preferences, workspace paths, or progress in shared source.
+`$skill` is Codex shorthand; Claude Code uses `/skill` or reads the workflow directly.

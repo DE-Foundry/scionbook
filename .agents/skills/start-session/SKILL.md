@@ -1,27 +1,36 @@
 ---
 name: start-session
-description: Start or resume the read-only Scionbook Session Planner, load the five saved sources, check freshness and resets, and plan gameplay. Keeps all new progress in this conversation.
+description: Start or resume the ongoing Scionbook player conversation, load saved state, check freshness and resets, and plan gameplay. Preferences and confirmed reports save locally without a handoff.
 ---
 
-# Start session
+# Start or resume play
 
-Load and apply saved preferences using [gameplay preference rules](../../../docs/gameplay-preferences.md).
+Read root AGENTS.md, standards.md, and [preference rules](../../../docs/gameplay-preferences.md).
+Use the current conversation, including after setup, sync, or local saves. Do not require a new chat,
+retrieve another transcript, use global memories, or treat this invocation as a context reset.
 
-Read root AGENTS.md and standards.md. Establish the Session Planner role in a fresh gameplay chat; if this is an established Maintainer chat, direct the user to a separate session chat instead. Never write files, run sync/scrapers, request write escalation, or communicate with another agent except the user-confirmed recap transport defined in docs/chat-handoffs.md.
+Read scionbook.json first, then status.json (fetched_at_utc, notes, still_not_available),
+SCIONBOOK_INSTRUCTIONS.md, SCIONBOOK_MEMORY.md, SCIONBOOK_DAILY_WEEKLY_CHECKLIST.md, and available
+quest_history.md. Missing configuration/initial files routes to [setup](../setup/SKILL.md) here when
+supported. A new public setup has no private history; retained full-mode history is historical only.
+Unknown data never establishes zero balances or no progress.
 
-A confirmed post-sync launch must be a new context, not a continuation/fork of the Maintainer transcript. Load all sources anew; do not import maintenance messages or credentials. Invoking this skill inside the old chat is not a context reset.
+- Use `Session YYYY-MM-DD` in the configured timezone, without changing chat titles. Preserve newer
+  conversation reports and dated saved outcomes; do not duplicate them when resuming.
+- State actual snapshot age and material gaps. A stale snapshot alone does not authorize sync. A user
+  refresh request invokes [sync](../sync/SKILL.md) here, then reloads local files and continues play.
+  Avoid precise transactions from invalidated balances/holdings. Do not request credentials in chat.
+- Verify current daily/weekly reset rules from authoritative sources and compare reset boundaries with
+  dated completions. A local date change alone does not establish a reset. Ask about unknown availability
+  only when it affects the plan. Do not hardcode reset times into reusable routines.
+- Apply saved priorities, platform/input, spoiler tolerance, and session-only choices. Offer one feasible
+  primary objective, useful setup, one or two relevant detours, and a stopping point. Ask about time only
+  when it materially changes the plan. Only unlocked activities are immediately runnable.
+- Use specialists when relevant; verify patch-sensitive mechanics and rewards. A queue, accepted quest,
+  proposed purchase, or unlocked Savage duty is not a clear. Keep routines and longer progression distinct.
+- Clear durable preferences and confirmed progress use [save-state](../save-state/SKILL.md) immediately.
+  Discussion can explore possibilities without saving a decision. Use [tasks](../tasks/SKILL.md) for
+  reports/next actions and [recap-session](../recap-session/SKILL.md) for a requested summary.
 
-Read scionbook.json first. If missing, direct setup to a Maintainer chat; do not invent a character.
-
-Read status.json (fetched_at_utc, notes, and still_not_available first), SCIONBOOK_INSTRUCTIONS.md, SCIONBOOK_MEMORY.md, SCIONBOOK_DAILY_WEEKLY_CHECKLIST.md, and quest_history.md. A new public setup has no private quest_history.md; a checkout switched from full to public may retain an older history, which is historical only. Neither case establishes current private completion. If status.json or the local memory/checklist files are missing, direct completion of setup to Maintainer.
-
-These sources plus this conversation are the session's context; do not read other chat histories or global memories.
-
-- Label the session `Session YYYY-MM-DD` using the timezone in scionbook.json. Only the session name is needed; do not change the chat title or mention title controls. Resume same-day outcomes already in this conversation or the source files without duplicating them.
-- Reconcile newer player reports with the actual snapshot date. If today's refresh is missing or a substantial inventory cleanup invalidates it, identify the source age and direct the user to `$sync` in the Maintainer chat. Continue with supported advice only, avoiding precise transactions from stale balances/inventories. Do not request scraper credentials. If the user reports that sync is ready, reload scionbook.json and the five files without discarding newer in-conversation reports.
-- Check the clock and verify applicable daily/weekly reset rules from current authoritative sources. Compare reset boundaries with dated completions; a local date change alone does not prove a reset. Keep ambiguous availability unknown and ask only when it affects the plan. Do not hardcode reset times into the reusable checklist.
-- Briefly state progression, what has reset, outstanding follow-ups, and one primary objective. Include useful setup, one or two relevant detours matching the player's goals, and a stopping point. Ask about time only when it materially changes the plan; avoid dumping the full checklist.
-- Apply configured spoiler, platform, input, and goal preferences. Load inventory-cleanup, market-update, gear-planner, or hunt-planner only when relevant. Verify patch-sensitive mechanics/rewards. Do not browse character databases as a substitute for the snapshot.
-- Offer only unlocked tasks as immediately runnable. Accepted quests, queues, proposed purchases, and unlocked Savage duties are not clears. Keep daily chores, weekly rewards, and longer progression distinct.
-
-Use [tasks](../tasks/SKILL.md) for in-conversation progress and next actions. Use [recap-session](../recap-session/SKILL.md) when asked for the combined worth-saving recap. Tasks never saves files; recap-session can offer a confirmed isolated apply handoff but never directly edits gameplay files. Do not emit running worth-saving summaries.
+Local read/write access supports normal play. If the host only allows reading/uploaded files, continue
+supported discussion and identify unsaved changes; do not pretend a write succeeded or require a handoff.

@@ -29,4 +29,5 @@ possible clearance when rounding hides the exact total. Never promise an uncerta
 Recommend one practical upgrade path with source, cost, expected benefit, prerequisites, and a stopping
 point. Flag important opportunity costs and unverified weekly balances. Respect spoiler preferences and
 platform/input context. Currency spending, loot, and purchases stay proposed until the player reports them;
-Session Planner uses tasks/recap and Maintainer saves only an explicitly supplied recap.
+clear confirmations and standing preferences save immediately through
+[save-state](../save-state/SKILL.md), without rewriting generated gear/currency evidence.

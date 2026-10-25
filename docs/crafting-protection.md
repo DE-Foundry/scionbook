@@ -8,7 +8,7 @@ Inventory cleanup reads the saved list. Chat context and Scionbook memory are no
 
 1. Complete character setup and a validated full sync. Public mode cannot infer unfinished quests from
    unavailable private history. If no complete snapshot exists yet, obtain it before building the plan.
-2. In Maintainer, request crafting-material protection. Follow
+2. In the current conversation, request crafting-material protection. Follow
    [quest inference](../.agents/skills/inventory-cleanup/references/quest-material-inference.md) to research
    each relevant class chain through the saved level. Save verified references in a version 2
    `quest_turnins.json`, using the configured character ID and real Lodestone quest IDs. Include explicit

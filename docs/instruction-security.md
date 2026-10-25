@@ -47,7 +47,26 @@ The command uses the local checker, so it is a development aid, not the trusted 
 ASCII JSON with paths and reasons, without source snippets, and appends escaped findings to the GitHub
 step summary when available. Review findings are visible on the checks page even on a green run. It does not read ignored player files.
 
-## Automated recap proposals
+## Same-chat local saves
+
+The player agent now has local write access for immediate preferences/reports and explicitly requested
+syncs. Ordinary conversation does not authorize shared application changes. Host permissions determine
+what other tools can write; skills and a helper allowlist are not a sandbox for the whole assistant.
+
+scionbook_state.py prepares bounded source snapshots in ignored .scionbook-state-<token>/ before an
+edit is composed. It calls no model or network. Apply accepts a proposal on stdin and reuses the recap
+installer's validation, conflict detection, rollback journal, and saved-byte verification. Only memory,
+checklist, and configuration preferences can change; identity, generated data, and source timestamps
+remain protected. Successful/unchanged applies remove their prepared snapshot. Failed/conflicting edits
+remain private until canceled or retried with a new preparation. Treat those snapshots as player data.
+The snapshot is a concurrency preimage, not a signature or boundary against a malicious local process.
+
+In Git checkouts the helper refuses tracked or nonignored output/staging paths. Release ZIPs work without
+Git. These checks do not inspect every possible write by other agent tools or replace pre-push privacy
+review. Never put personal workspace paths, discussions, preferences, test results, or copied snapshots
+into shared source. Real-data smoke checks are local only; permanent tests use synthetic fixtures.
+
+## Optional legacy automated recap proposals
 
 The optional CLI recap handoff requires prior approval for the exact recap and a user-accessible terminal.
 It takes bounded snapshots of selected local files, includes the complete apply-recap skill as a separate
@@ -118,8 +137,9 @@ inside that boundary.
 
 `.scionbook-recap.lock` prevents overlapping helper runs. An interrupted installation retains an ignored
 `.scionbook-recap-*/` directory with `journal.json`, numbered new files, and available numbered old backups.
-It contains private player data and must never be committed or shared. Later handoffs stop while a journal
-or lock remains. Ordinary installation errors attempt rollback and remove the journal only after all affected destinations
+It contains private player data and must never be committed or shared. Later helper saves/handoffs stop while an installation journal
+or lock remains. Prepared .scionbook-state-* originals are not installation journals and do not block
+other edits; their source comparisons prevent stale installation. Ordinary installation errors attempt rollback and remove the journal only after all affected destinations
 verify against their original contents. Failed or unverifiable rollbacks retain recovery files; process/machine crashes can leave a
 partially installed set because multiple replacements are not one filesystem transaction.
 

@@ -5,6 +5,7 @@ Run with: python3 -m pytest tests/
 """
 import pathlib
 import sys
+import pytest
 
 from bs4 import BeautifulSoup
 
@@ -196,6 +197,15 @@ def test_reconcile_currencies_backfills_current_tomestones_as_zero():
 
 # --------------------------------------------------------------------------- #
 # parse_quests_page
+
+@pytest.mark.parametrize('text,expected', [
+    ('Role Quests (Expansion) (A Restless Night)',
+     ('Role Quests (Expansion)', 'A Restless Night')),
+    ('Job Quests (A Title (With Parentheses))',
+     ('Job Quests', 'A Title (With Parentheses)')),
+])
+def test_quest_category_and_title_parentheses(text, expected):
+    assert fr.split_category(text) == expected
 # --------------------------------------------------------------------------- #
 
 def test_parse_quests_page_basic_fields():
@@ -977,6 +987,45 @@ def test_fetch_prices_does_not_retry_a_404(monkeypatch):
     out = fr.fetch_prices([7], "Example DC", sess, chunk=1, attempts=3)
     assert out == {}
     assert len(sess.calls) == 1, sess.calls
+
+
+def test_fetch_prices_remembers_smaller_batches_and_tracks_coverage(monkeypatch):
+    monkeypatch.setattr(fr.time, "sleep", lambda *_: None)
+    sess = _FakeSession(slow_ids=range(1, 9))
+    coverage = {}
+    out = fr.fetch_prices(range(1, 9), "Example DC", sess, chunk=4, coverage=coverage)
+    assert set(out) == set(range(1, 9))
+    assert [len(batch) for batch in sess.calls] == [4, 2] + [1] * 8
+    assert coverage['complete']
+    assert coverage['failed_item_ids'] == []
+
+
+def test_batch_404_does_not_hide_valid_neighbours(monkeypatch):
+    monkeypatch.setattr(fr.time, "sleep", lambda *_: None)
+    class Batch404(_FakeSession):
+        def get(self, url, timeout=None):
+            response = super().get(url, timeout)
+            return _FakeResp(404) if len(self.calls[-1]) > 1 else response
+    sess = Batch404(absent_ids=[7])
+    coverage = {}
+    out = fr.fetch_prices([6, 7], "Example DC", sess, chunk=2, coverage=coverage)
+    assert set(out) == {6}
+    assert coverage['unavailable_item_ids'] == [7]
+    assert not coverage['complete']
+
+
+def test_malformed_pricing_response_is_retried_and_reported(monkeypatch):
+    monkeypatch.setattr(fr.time, "sleep", lambda *_: None)
+    class Malformed:
+        calls = 0
+        def get(self, *args, **kwargs):
+            self.calls += 1
+            return _FakeResp(200, {'error': 'not item data'})
+    session, coverage = Malformed(), {}
+    assert fr.fetch_prices([1], "Example DC", session, attempts=1, coverage=coverage) == {}
+    assert session.calls == 3
+    assert coverage['failed_item_ids'] == [1]
+    assert not coverage['complete']
 
 
 def _consolidation_data(rows, listings_by_retainer):
