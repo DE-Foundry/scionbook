@@ -23,7 +23,7 @@ Keep private backups outside the project repository; keep credentials out of tho
 2. Have your agent verify the ZIP's SHA-256 against the downloaded checksum. Extract into a new local
    folder, keeping hidden directories such as `.agents`, `.claude`, and `.codex`.
 3. Open the extracted folder in your agent. Follow [Get started](../README.md#get-started) to install
-   Python dependencies and complete setup in a fresh Repository Maintainer chat. A ZIP includes all
+   Python dependencies and complete setup in the current conversation with local write access. A ZIP includes all
    project files, but Python, third-party packages, and your agent are installed separately.
 
 You do not need to initialize Git, create a fork, or configure a remote. Example agent request:
@@ -36,14 +36,14 @@ Keep all player data local. Ask me for any missing setup details; never ask me t
 
 ### Update a ZIP installation
 
-1. Finish active saves or refreshes. Save any outstanding session recap through Maintainer first.
+1. Finish active saves or refreshes. Save outstanding explicit reports locally through save-state first.
 2. Read the new release notes for compatibility changes and migration instructions. Back up the current
    local player files together outside the project repository, preserving their existing timestamps.
 3. Download, verify, and extract the new release into a **new folder**. Do not extract over your current
    installation or replace your player files with neutral templates.
 4. Follow [Move to a new directory without another sync](../README.md#move-to-a-new-directory-without-another-sync)
    for the exact state-file list and copy procedure. Recreate the Python environment in the new folder.
-5. Apply any documented migration to the copied state, then open a fresh read-only Session Planner to
+5. Apply any documented migration to the copied state, then load it with start-session in a conversation with local write access to
    load it. Moving/updating alone does not require setup or a scrape. Check that the character, saved
    reports, and snapshot date are correct before making the new folder your active installation.
 

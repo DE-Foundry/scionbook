@@ -1,19 +1,21 @@
 ---
 name: start-maintenance
-description: Start the independent Scionbook Repository Maintainer chat for code, skills, instructions, data questions, sync, and applying an explicitly supplied session recap. Does not start gameplay.
+description: Begin explicit Scionbook code, skill, test, or shared documentation maintenance. Personal saves and refreshes are also available in the ongoing player conversation.
 ---
 
 # Start maintenance
 
-Read root AGENTS.md and standards.md. Establish Repository Maintainer in a fresh chat. If this is an established Session Planner chat, direct the user to a separate Maintainer chat; do not switch roles or inherit gameplay context.
+Read AGENTS.md and standards.md. Load only code and sources relevant to the actual request. Use this
+conversation and local project files; never read other chats, global memories, or session storage.
+A separate development conversation is optional and recommended for substantial application work,
+not required for setup, sync, preferences, or progress saves. An invocation does not clear context.
 
-Use this chat and the repository only. Do not read other chats, global memories, or session storage; do not contact an existing Session Planner or spawn it as a subagent. A confirmed post-sync fresh-chat launch follows docs/chat-handoffs.md. Load code and Scionbook sources relevant to the actual request. Read status.json's timestamp, notes, and still_not_available before character-data answers.
+Handle explicitly requested application changes within scope. Never put player identity, preferences,
+workspace paths, or reports into shared source, examples, fixtures, or Git history. Development tests use
+synthetic data. User-authorized checks with real data stay local and out of the permanent test suite.
+Use [save-state](../save-state/SKILL.md) for explicit local reports/preferences, [apply-recap](../apply-recap/SKILL.md)
+for a supplied recap, and [sync](../sync/SKILL.md) only for a requested refresh. No automatic commit/push.
 
-Handle code and instruction changes directly within the user's scope. Use [sync](../sync/SKILL.md) for requested scrape/reconciliation work and [apply-recap](../apply-recap/SKILL.md) for gameplay reports explicitly supplied for saving. Do not run a sync merely because the Maintainer was started. Starting this role does not authorize a commit or push.
-
-Explicit personal preference-save requests follow [gameplay preferences](../../../docs/gameplay-preferences.md).
-Save durable preferences locally without requiring a gameplay recap or authorizing a refresh.
-
-When started after a successful recap handoff, reload durable local sources as needed. Do not retrieve the previous execution, ask to reapply the recap, or automatically sync. A same-chat invocation never clears context.
-
-If no task accompanies startup, briefly identify the role and available next actions: code/instruction work, `$sync`, or a pasted recap with `$apply-recap`. Do not produce a gameplay session plan.
+If startup has no task, briefly identify available maintenance actions without starting gameplay or sync.
+If the user explicitly asks to return to play, [start-session](../start-session/SKILL.md) can reload sources
+in this conversation. Do not claim a context reset or require a new chat.

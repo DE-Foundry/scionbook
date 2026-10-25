@@ -3,7 +3,7 @@
 ## Shared code and local state
 
 The project name is Scionbook. Product-owned modules, commands, configuration, staging, and cache paths
-use scionbook; FFXIV refers to the game or upstream resources. Roles are Session Planner and Repository Maintainer.
+use scionbook; FFXIV refers to the game or upstream resources. Session Planner handles the ongoing player workflow; Repository Maintainer handles explicit application changes.
 There are no compatibility aliases for unreleased project names.
 One character per checkout. No hardcoded character, server, retainer, account, platform, timezone,
 progression tier, or remote repository. Setup resolves identity and saves scionbook.json locally.
@@ -35,18 +35,20 @@ per-craft inputs as per-output quantities; round required crafts up using the ve
 ## Workflow boundaries
 
 Python data tools must not depend on an AI provider or model API. Shared Markdown workflows support
-explicit file-based invocation without native skill syntax. Manual prompt/recap handoffs are the portable
+explicit file-based invocation without native skill syntax. Direct file-based workflows are the portable
 baseline; client-specific configuration, URL schemes, permission flags, and launchers are optional adapters
 documented under docs/integrations/. Never apply one client's controls to another or claim a text prompt
 enforces permissions. Document capability limits instead of claiming universal client compatibility.
 
-Session and Maintainer chats remain independent. After showing a recap, offer the available confirmed
-apply-to-Maintainer handoff; after successful sync, offer a fresh Session Planner. Draft links require user
-submission; supported full-launch transports run only after explicit Yes. Forward only the approved recap to apply; subsequent startup uses local files and
-no old transcript. Check transport before asking; optional Codex desktop deep links prepare a fresh composer but do not
-send the prompt or select permissions. Apply drafts also require the user to paste the recap. The destination
-Apply Recap chat provides the follow-up draft only after a verified save. Disclose those steps upfront. Use docs/chat-handoffs.md. Neither
-compaction, resume/fork, nor invoking a different skill resets context. Runtime permissions still apply.
+The normal player workflow is one ongoing conversation with local write access: setup, sync,
+discussion, planning, and verified personal saves. Clear standing preferences and confirmed reports
+save immediately through save-state; speculative discussion and session-only choices do not become
+durable decisions. A recap is an optional summary/import format, never a required save/handoff step.
+Application source changes require an explicit maintenance request. Shared skills never acquire player
+preferences or workspace paths. New chats and legacy adapters remain optional; a reload is not a context
+reset. With read-only/upload-only access, prepare unsaved proposals and disclose the capability limit.
+After validated sync, reload sources and reconcile advice in the same conversation, preserving newer
+player reports and showing any conflicts with lagging fetched data. Do not launch a new chat automatically.
 Specialist skills own detailed cleanup, market, gearing, and hunt procedures. Core instructions route to them.
 Hunt plans default to practical travel order, grouping nearby suitable targets and separating skipped or
 conditional marks; verify travel dependencies and state the proposed start when the current location is unknown.
@@ -57,6 +59,14 @@ routines, session-only overrides, and completed outcomes distinct; never embed t
 Never commit or push player data, including to private branches. Sync only saves local ignored files.
 
 ## Inventory and market recommendations
+
+Check item market eligibility and known NPC sale value before requesting market prices. Explicit
+market-prohibited stacks need no market request; missing prices never prove an item is unsellable.
+Reduce failed pricing batches down to individual requests and reuse smaller successful sizes.
+Sync timing/completeness choices belong in ignored configuration under preferences.sync. Assume complete pricing unless the user chooses otherwise. Persistent failures offer retry,
+smaller batches down to one, or explicit acceptance of remaining gaps for this run. Do not silently
+relax coverage for speed or turn a one-run choice into a standing preference. Ignoring pricing failures
+does not waive other sync validation. Preserve existing files until the chosen refresh validates.
 
 Each market-board listing holds at most 99 items, or the item's lower stack limit. Distinguish total stock
 from per-listing quantities and count each split listing against its retainer's available slots. Smaller

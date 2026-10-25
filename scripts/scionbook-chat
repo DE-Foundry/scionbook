@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Start a fresh, independent role chat; no inherited transcript or global memory.
+# Optional interactive startup; ordinary saves and syncs stay in the current chat.
 # SCIONBOOK_CLIENT selects the agent CLI: codex (default) or claude.
 set -euo pipefail
 scionbook_repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -10,10 +10,10 @@ if [[ $# -ne 1 ]]; then
 fi
 case "$1" in
   session)
-    scionbook_sandbox=read-only
-    scionbook_approval=never
+    scionbook_sandbox=workspace-write
+    scionbook_approval=on-request
     scionbook_skill=start-session
-    scionbook_role='You are the Session Planner. Keep all new gameplay progress in this conversation and never write files or request escalation.'
+    scionbook_role='You are the Session Planner. Discuss options, save clear preferences and confirmed reports to ignored local files, and run explicitly requested syncs in this conversation. Personal data never changes shared application source.'
     ;;
   maintainer)
     scionbook_sandbox=workspace-write
@@ -35,12 +35,7 @@ case "$scionbook_client" in
     cd "$scionbook_repo_root"
     export CLAUDE_CODE_DISABLE_AUTO_MEMORY=1
     scionbook_prompt="Follow the $scionbook_skill skill in $scionbook_file. $scionbook_role"
-    if [[ "$1" == session ]]; then
-      # Read-only: only file reads are allowed; everything that would prompt is denied.
-      exec claude --permission-mode dontAsk --allowedTools Read Grep Glob WebSearch WebFetch \
-        --disallowedTools Bash Edit Write NotebookEdit Agent -- "$scionbook_prompt"
-    fi
-    # Writes ask for approval, as with Codex on-request.
+    # Both interactive workflows keep the client's normal approval controls.
     exec claude --disallowedTools Agent -- "$scionbook_prompt"
     ;;
   *)

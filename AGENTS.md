@@ -1,95 +1,85 @@
 # Scionbook Project Instructions
 
-## Project memory
+## Shared source and private state
 
-This project does not use asks.md or decisions.md. Do not create either file or prompt to log requests.
-Shared conventions live in standards.md. Personal configuration and preferences live in scionbook.json;
-player reports live in SCIONBOOK_MEMORY.md and SCIONBOOK_DAILY_WEEKLY_CHECKLIST.md.
-Personal files are local and ignored by Git; templates contain no player state.
+This project does not use asks.md or decisions.md. Do not create either or prompt to log requests.
+Shared conventions live in standards.md. Character identity, preferences, progress, and workspace-specific
+settings belong only in ignored local files, never shared instructions, skills, templates, fixtures,
+branches, commit metadata, release assets, or repository history. This includes private forks.
+One character per checkout; no invented identity. Personal files stay ignored; templates stay neutral.
 
-## Personal gameplay preferences
+## One ongoing player conversation
 
-Follow docs/gameplay-preferences.md for storage, precedence, and recap rules. Load
-scionbook.json preferences.gameplay before planning or specialist recommendations. Newer
-explicit conversation preferences take precedence; session-only choices do not rewrite
-durable priorities. Keep preferences, proposed actions, and completed outcomes separate.
-Maintainer may save explicitly supplied preferences without a gameplay recap or sync;
-Session Planner remains conversation-only. Missing configuration uses the documented
-ignored pre-setup seed, never invented identity.
-
-## Assistant portability
-
-These instructions apply to any assistant. Read workflows directly from `.agents/skills/<name>/SKILL.md`;
-`$name` is optional client shorthand. Natural-language requests to follow the named workflow select the
-same role. See docs/assistant-setup.md for capabilities and manual file provision. Never assume native
-skill discovery, shell access, a new-chat API, or another client's permission settings.
-
-## Independent chat roles
-
-Choose the role from an explicit request or entry skill. `$start-session` selects Session Planner;
-`$setup`, `$start-maintenance`, `$sync`, `$apply-recap`, or repository work selects Repository Maintainer
-in a fresh chat. Keep the established role. Direct the other role's work to a separate chat.
-Editing skill files is maintenance, not invocation.
-
-Use only this conversation and repository files. Never read another chat transcript, search session
-storage, use global memories, contact existing role chats, or spawn the other role as a subagent.
-User-confirmed handoffs may launch isolated top-level runs/new chats under docs/chat-handoffs.md.
-Only the approved recap crosses into apply-recap; subsequent startup contexts receive no old transcript.
-
-### Session Planner
+Setup, sync, discussion, planning, and local saves can all happen in the same conversation. Setup's first
+validated sync makes that conversation ready for play; do not require or offer a chat handoff after every
+save or refresh. A new chat is optional when the user wants one. It reloads durable local sources.
+Starting another skill, reloading files, or compacting does not clear the existing conversation.
 
 Read scionbook.json plus status.json, SCIONBOOK_INSTRUCTIONS.md, SCIONBOOK_MEMORY.md,
-SCIONBOOK_DAILY_WEEKLY_CHECKLIST.md, and quest_history.md. Read standards.md for shared conventions.
-If configuration or initial sources are missing, direct the user to `$setup` in the Maintainer chat.
-Public mode has no private quest history; unavailable data is unknown, never empty progress.
+SCIONBOOK_DAILY_WEEKLY_CHECKLIST.md, and available quest_history.md for gameplay. Read standards.md.
+Check fetched_at_utc, notes, and still_not_available before character-dependent advice. Missing private
+history in public mode is unknown progress, not an empty completion list. Missing configuration or
+initial sources routes to setup in this conversation when the host supports it.
 
-Track new reports only in this conversation. Never directly write files, scrape, run setup/sync, apply
-recaps in this chat, commit, push, or request write escalation. `$recap-session` first outputs text, then
-provides the manual handoff from docs/chat-handoffs.md. Optional automation requires explicit Yes for
-the supported route: an app draft the user submits, or an isolated apply-recap followed by a fresh
-start-maintenance. The apply destination verifies the save; a prepared prompt or draft is neither a save
-nor a started workflow.
-This exception does not change the Session Planner's role/permissions. If runtime blocks the transport,
-provide the manual handoff rather than bypassing the sandbox. No automated action on No or silence.
+Use only this conversation and local project files. Never read another chat transcript, search session
+storage, use global memories, contact existing chats, or spawn another role as a subagent.
 Use `Session YYYY-MM-DD` in the configured timezone; do not manage chat titles.
-When stale, state the actual snapshot age and request Maintainer sync. Preserve newer conversation
-reports when refreshed files are loaded; do not use stale balances for precise transactions.
 
-### Repository Maintainer
+## Immediate local persistence
 
-Handle code, skills, setup, data questions, refreshes, and explicitly supplied recap saves.
-Do not start gameplay planning automatically. Apply gameplay reports only from a user-supplied recap;
-never infer unreported outcomes or hand-edit generated status/history to represent a report.
-Keep dated outcomes separate from reusable routine boxes. Version edited memory and shared instructions.
-A prose save never advances a scrape timestamp. Setup authorizes its initial refresh; subsequent sync
-requires an explicit request. Applying a recap alone does not authorize sync.
-After successful sync and reconciliation, check available handoff transport before offering a new session.
-In the Codex desktop app, an optional documented draft link can prefill start-session; disclose that the user must select
-read-only and press Send. Offer full launch only when supported. Follow docs/chat-handoffs.md; use explicit
-Yes for transitions and never claim a draft started the skill or the current context was cleared.
+Follow docs/gameplay-preferences.md and .agents/skills/save-state/SKILL.md. Clear standing preferences,
+corrections, and confirmed player reports authorize an immediate verified local save. Do not defer them
+to a recap or ask the user to repeat an unambiguous instruction. Discussions, tentative ideas, proposed
+actions, and session-only choices do not establish durable decisions or completions. Ask only when
+scope or intent materially affects what would be saved; continue useful discussion meanwhile.
 
-There is no standing commit/push authorization. Character identities, profile links, account data,
-preferences, gameplay reports, and personal information must never enter tracked files, branches,
-tags, release assets, or repository history. This includes private branches and forks used for project
-work. Never force-add player data or configure Git backups in this repository. Local player files stay ignored.
-Before any authorized push, ensure this checkout has the local denylist and privacy hook configured
-under docs/releasing.md#privacy-before-push. Keep identifying terms only in ignored local configuration;
-never put them in tracked examples or logs. Do not bypass a blocked push or use dummy terms to satisfy
-the check. Report missing setup or findings for private resolution within the user's authorized scope.
-The GitHub release secret does not replace local setup. Public GitHub contributor handles and noreply
-attribution are permitted and should not be denied. Follow the identity guidance in docs/releasing.md
-for web-merge email privacy; never treat a local hook as protection for server-created commits.
+Current preferences live in scionbook.json; memory is dated evidence/history, not a competing preference
+database. Preserve unrelated settings and distinguish durable preferences, temporary choices, proposed
+actions, and completed outcomes. Missing configuration uses the documented ignored pre-setup seed.
+Record dated outcomes separately from reusable routine boxes. Version edited memory/shared instructions.
+Never hand-edit generated status.json or quest_history.md to represent reports or advance scrape times.
+Re-read saved bytes before claiming a save. Repeated identical reports are no-ops.
+
+## Refresh and reconciliation
+
+Follow .agents/skills/sync/SKILL.md only for an explicit refresh request or setup's initial refresh.
+A report save, changed preference, old snapshot, or recap mentioning sync does not authorize a scrape.
+Fetch and validate first, reconcile evidence separately, then reload installed local sources in the same
+conversation. Preserve newer player reports: a newer fetch can still contain lagging game data.
+State actual snapshot age; avoid precise transactions from invalidated holdings or balances.
+
+Assume full pricing for authenticated refreshes unless the user chooses otherwise. Check market
+eligibility and known vendor sale value before market requests. Failed batches shrink toward one item.
+If failures persist, let the user choose retry, smaller batches down to one, or ignore remaining pricing
+failures for this run with gaps disclosed. Never silently reduce coverage for speed or change a standing
+preference from a one-run choice. Ignoring prices does not waive authentication or history validation.
+
+## Application maintenance
+
+Repository Maintainer is a purpose for explicit code, skill, test, and shared documentation work, not a
+required gateway for personal saves or refreshes. A separate maintenance chat is optional; do not start
+gameplay planning automatically when the user requested development. Editing a skill is maintenance,
+not invocation. Player discussion must never silently modify application behavior or shared source.
+
+There is no standing commit/push authorization. Never force-add player data or configure Git backups.
+Before any authorized push, verify this checkout's ignored denylist and local privacy hook under
+docs/releasing.md#privacy-before-push. Keep private terms only in ignored local configuration. Never
+bypass a blocked push or use dummy terms. The release secret does not replace local protection.
+Public GitHub contributor handles and noreply attribution are permitted. Follow docs/releasing.md for
+web-merge email privacy; a local hook does not protect server-created commits.
 Report local saves, refreshes, commits, and verified pushes separately.
 
 ## Skills and runtime
 
-Skills live in .agents/skills/. Core: setup, start-maintenance, sync, apply-recap, start-session,
-tasks, recap-session. Specialists: inventory-cleanup, market-update, gear-planner, hunt-planner.
-Specialist analysis works in either role without changing that role's write permissions.
+Read workflows directly from .agents/skills/<name>/SKILL.md; `$name` is optional client shorthand.
+Core: setup, start-session, tasks, save-state, recap-session, apply-recap, sync, start-maintenance.
+Specialists: inventory-cleanup, market-update, gear-planner, hunt-planner. Load only relevant guidance.
 
-Use read-only file access for Session Planner and repository read/write access for Maintainer, enforced
-by the chosen client's permission controls. Disable cross-chat memory/retrieval where supported; never
-use it for these workflows. Instructions do not change a chat's permissions or context. Use the user's
-chosen assistant and model. Optional Codex and Claude Code configurations and the `scripts/scionbook-chat` launcher apply
-only to their selected client; see docs/integrations/codex.md and CLAUDE.md.
-Manual prompts and handoffs work without those adapters.
+The player agent needs local read/write access and Python/network access for requested setup/sync.
+Use the selected client's actual permission controls; prompts do not enforce a file allowlist. Prefer the
+validated player-state helper for saves. Skills do not bypass host restrictions. With read-only or
+upload-only access, discuss/plan and prepare proposed changes, disclose that they are unsaved, and give
+manual steps without claiming success. A permission limit does not automatically require another chat.
+Disable cross-chat memory/retrieval where supported. Use the user's chosen assistant and model.
+Optional client launchers/configuration are documented in docs/assistant-setup.md,
+docs/integrations/codex.md, and CLAUDE.md. Optional new-chat tools are never prerequisites for play.

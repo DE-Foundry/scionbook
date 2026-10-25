@@ -1,67 +1,55 @@
 # Use Scionbook with your assistant
 
-Scionbook's Python tools fetch and process game data without calling an AI model. Its workflows are
-Markdown files in `.agents/skills/`; the directory name does not require a particular client. You choose
-the assistant and model. There is no model API dependency or Scionbook AI account to configure.
+Scionbook's Python tools fetch/process game data and verify local saves without an AI-provider SDK or
+model API key. Workflows are Markdown in .agents/skills/. Choose your assistant and model; native skill
+discovery is optional. Read a workflow directly and follow its linked guidance when needed.
 
 ## Capabilities
 
 | Task | Required access |
 |---|---|
-| Plan a session or produce a recap | Read the shared instructions and saved player sources; retain this chat's reports |
-| Setup or sync | Read/write local files, execute Python, access the game-data services; full mode also needs locally supplied credentials |
-| Apply a recap | Read/write local files and verify the saved result; no scrape or credentials needed |
-| Verify current mechanics or prices | Public web/API access, or current references supplied by the user |
+| Discuss options or plan play | Read saved sources and retain this conversation's reports |
+| Save preferences or confirmed progress | Local read/write access and Python for validated saves |
+| Setup or explicitly requested sync | Local read/write, Python, network; full mode also needs local credentials |
+| Verify current mechanics/prices | Public web/API access or current references provided by the user |
+| Change application behavior | Explicit development request and shared-source write access |
 
-Give Session Planner read-only file access. Give Repository Maintainer write access in a separate chat.
-Use the client's actual permission controls; a prompt cannot enforce them. Disable cross-chat memory or
-retrieval for these chats where available. Do not load other conversations. If a client cannot isolate
-context or restrict tools appropriately, use a fresh chat with manually supplied files and no write tools.
+Use one ongoing player conversation with local read/write access. It can set up, sync, plan, discuss,
+and save reports/preferences without changing chats. Real host permissions still apply; a prompt does
+not enforce a filesystem allowlist. The player-state helper enforces its own permitted destinations,
+checks that those destinations/staging are ignored in Git checkouts, and verifies saves.
 
-An assistant with uploads but no filesystem can plan from supplied files and prepare a recap. It cannot
-execute setup/sync or verify local saves. Use a local-capable assistant or perform the documented steps
-manually for those tasks, and supply the resulting files. When browsing is unavailable, identify which
-current facts remain unverified; do not substitute remembered prices or patch details.
+Read-only/upload-only clients can discuss and prepare proposed changes, but must say those changes are
+unsaved. The user can apply them with a local-capable assistant or the documented manual/helper route,
+then provide the resulting files. Never claim local persistence or a refresh from an uploaded proposal.
+Missing tools do not automatically require a new chat or authorize a sandbox bypass.
 
-## First use
+Disable cross-chat memory/retrieval where supported. Use this conversation and local sources only;
+never search chat storage or import another transcript. Application development may use a separate
+maintenance conversation for focus, but ordinary saves and syncs do not depend on it.
 
-1. Choose a [release ZIP or personal fork](installation.md), then install Python dependencies using
-   the [README](../README.md#get-started).
-2. Open a fresh Maintainer chat with this repository available. Paste:
+## First use and continuation
 
-   ```text
-   Read AGENTS.md, standards.md, and SCIONBOOK_INSTRUCTIONS.md.
-   Follow .agents/skills/setup/SKILL.md to set up [Character Name] on [Home World].
-   ```
-
-3. Complete setup and the initial validated refresh. Open a separate read-only chat and paste:
-
-   ```text
-   Read AGENTS.md and follow .agents/skills/start-session/SKILL.md.
-   ```
-
-If the assistant does not automatically discover AGENTS.md, explicitly provide it and each referenced
-file it needs. File-upload clients need scionbook.json, status.json, SCIONBOOK_INSTRUCTIONS.md,
-SCIONBOOK_MEMORY.md, SCIONBOOK_DAILY_WEEKLY_CHECKLIST.md, standards.md, and quest_history.md when
-available, plus the requested workflow and its referenced guidance. Missing data remains unknown.
-Refresh uploaded copies when the local sources change. Share player files only with a provider you choose;
-never upload credentials, raw authenticated page dumps, or the repository's `.git` directory.
-
-## Choose a workflow
-
-Use `Read .agents/skills/<name>/SKILL.md and follow it: <your request>` for any workflow in the
-[skill guide](skills.md). For example:
+Install Python dependencies using [Get started](../README.md#get-started), then send:
 
 ```text
-Read .agents/skills/market-update/SKILL.md and follow it to review my listings.
+Read AGENTS.md and follow .agents/skills/setup/SKILL.md for [Character Name] on [Home World].
 ```
 
-`$market-update` and other `$name` examples are shorthand for clients with native skill discovery, not
-portable commands. A skill is an instruction document, not an installed executable. Follow linked files
-only as needed. Every client uses the same role, source-fidelity, consent, and save-verification rules.
+After its first validated sync, continue playing in that conversation. Existing setups can send:
 
-Use the [manual handoff](chat-handoffs.md) to move between chats. Optional [Codex adapters](integrations/codex.md)
-provide convenience only. `CLAUDE_PROJECT_CUSTOM_INSTRUCTIONS.md` is also a small optional instruction
-pointer; it does not grant filesystem access or establish tested compatibility with every Claude client.
-Other clients can use the prompts above without a new adapter. Compatibility is capability-based; this
-repository does not claim end-to-end testing of every AI provider.
+```text
+Read AGENTS.md and follow .agents/skills/start-session/SKILL.md.
+```
+
+Clear durable preferences and confirmed reports save when supplied. Exploratory discussion and temporary
+choices remain distinct. Later syncs require an explicit request, reload installed sources, and reconcile
+current advice while preserving newer reports. A new chat is optional when you want a fresh context.
+
+File-upload clients need configuration, status, shared instructions, local memory/checklist, standards,
+and available quest history plus the requested workflow. Refresh uploads after local changes. Share
+player data only with a provider you authorize; never upload credentials, raw authenticated HTML, or .git.
+When browsing is unavailable, identify unverified current facts rather than substituting remembered prices.
+
+See [skills](skills.md), [optional continuation tools](chat-handoffs.md), [Codex](integrations/codex.md),
+and [Claude Code](../CLAUDE.md). These adapters do not establish universal client compatibility.

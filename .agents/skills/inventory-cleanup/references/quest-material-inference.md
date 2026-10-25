@@ -7,8 +7,8 @@ current quest steps, acquired items, or completed turn-ins.
 1. Read the configured character's saved crafter levels and full quest history. Check identity, source time,
    quest warnings, and that total_completed equals the number of retained entries. Public, capped, failed,
    or missing history cannot establish non-completion. Preserve existing protection when evidence is missing;
-   ask only for the missing evidence or direct an authorized Maintainer refresh. Apply newer explicit player
-   reports before the snapshot, but save reported outcomes only through the normal recap workflow.
+   ask only for the missing evidence or direct an explicitly requested refresh. Apply newer explicit player
+   reports before the snapshot, but save confirmed reported outcomes through save-state without rewriting generated history.
 2. Read quest_turnins.json's saved quest references and quest_mats.json's recipe cache first. Reuse them;
    look up only missing quest tiers/items, changed game data, or an explicitly requested reference refresh.
    Look up the current quest chain for each unlocked crafting class when not yet recorded. Verify exact quest names/IDs, required
@@ -41,11 +41,12 @@ needs remain for those levels; missing/legacy empty data or gaps still means unk
 is by item type, not a claim that required quantities/HQ items are already owned. Releasing quest protection
 is not a discard instruction; normal inventory policies and other goals still apply.
 
-Maintainer can initialize/update the plan during protection setup or requested sync. Run:
+The ongoing player agent can initialize/update the plan during protection setup or requested sync. Run:
 `python3 scionbook_quest_mats.py --status status.json --turnins quest_turnins.json --out quest_mats.json`
 This reuses saved recipes, fetches only missing recipes, adds eligible tiers, removes completed-quest needs,
 and expires explicit level-limited keeps. Full sync does this reconciliation automatically for version 2 plans
 and builds the matching report using the new protection. Use `--refresh-recipes` only for deliberate recipe
 reference refreshes. Invalid history, regressed levels, wrong identity, or recipe failures preserve prior
 protection; unresolved special crafting needs remain visible gaps. Extend research coverage only where needed.
-Session Planner stays read-only; newer reports can guide advice and recap but do not mutate these files.
+Save newer reported outcomes locally; generated protection still uses validated snapshot/history evidence.
+Keep conflicting needs protected until reconciled rather than editing generated evidence to force a match.

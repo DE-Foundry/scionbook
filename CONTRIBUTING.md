@@ -44,7 +44,7 @@ python3 -m pytest tests/ -q
 
 The suite uses synthetic fixtures and requires no character account, cookie, or live service. Add tests
 for changed parser, authentication, persistence, or launcher behavior. For workflow changes, check the
-manual path, unavailable capabilities, role boundaries, and linked references. Describe checks actually
+direct local-save path, unavailable capabilities, shared-source/private-state boundaries, and linked references. Describe checks actually
 performed and remaining limits in the pull request. Do not claim fixture tests prove live compatibility.
 
 Keep changes focused. Discuss larger features in an issue before implementation. For bugs, include the

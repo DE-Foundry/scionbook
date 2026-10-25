@@ -7,11 +7,11 @@ description: Review FFXIV retainer inventory, consolidate stacks, protect needed
 
 Load and apply saved preferences using [gameplay preference rules](../../../docs/gameplay-preferences.md).
 
-Follow AGENTS.md and shared source/freshness rules. This is analysis in either role, not a role switch.
+Follow AGENTS.md and shared source/freshness rules. Recommendations do not execute in-game actions; requested local protection updates use the data workflow below.
 Read scionbook.json preferences, status.json warnings/gaps, local goals and newer player reports, and the
 matching cleanup.md (or report_md), plus quest_mats.json's protected_materials, material_reasons, and coverage_gaps.
 Read quest_turnins.json only when the saved research or keeps need review. If inventory is missing/public-only or invalidated by substantial
-cleanup, explain the gap and direct a refresh to Maintainer; do not infer empty storage.
+cleanup, explain the gap and offer an explicitly requested sync here; do not infer empty storage.
 
 Start with a short assessment: storage value estimates, occupied/free market slots by retainer, and
 whether a cleanup pass is useful for the player's goal. Do not dump every row by default.
@@ -27,9 +27,9 @@ whether a cleanup pass is useful for the player's goal. Do not dump every row by
   verify only missing/changed references; do not repeat lookups already saved in the data files or require
   Journal input when saved evidence suffices. Missing/legacy-empty protection or recorded coverage gaps
   means unknown coverage. A validated version 2 empty set can mean all researched needs are completed.
-- Maintainer maintains ignored quest_turnins.json and quest_mats.json using the persistent
-  [data workflow](../../../docs/crafting-protection.md); full sync reconciles them automatically.
-  The Session Planner makes the same inference read-only and records desired changes for recap only.
+- Maintain ignored quest_turnins.json and quest_mats.json when protection setup/changes are requested,
+  using the persistent [data workflow](../../../docs/crafting-protection.md). Full sync reconciles them
+  automatically. Newer player reports guide conservative advice but never fabricate generated history.
 - A market recommendation must beat the NPC vendor return after applicable fees and time/slot costs.
   Verify item eligibility before vendor/trade-in/discard advice. Keep uncertainties visible.
 
@@ -56,5 +56,5 @@ whether a cleanup pass is useful for the player's goal. Do not dump every row by
 
 Flag implausible totals, price-like quantities, unresolved names, dropped sale rows, and capacity conflicts
 before trusting the plan. Distinguish realistic depth-capped proceeds from optimistic full-stock value.
-Never execute or claim sales, moves, deletions, or purchases. Session confirmations use `$tasks` and recap;
-Maintainer saves gameplay outcomes only from an explicitly supplied recap.
+Never execute or claim sales, moves, deletions, or purchases. Clear confirmations use [tasks](../tasks/SKILL.md) and
+[save-state](../save-state/SKILL.md) immediately; no recap or handoff is required.

@@ -27,6 +27,26 @@ def configured(tmp_path, mode):
     return path
 
 
+@pytest.mark.parametrize('disabled', ['--no-pricing', '--no-retainers'])
+def test_saved_complete_pricing_preference_prevents_downgrade(monkeypatch, tmp_path, disabled, capsys):
+    path = configured(tmp_path, 'full')
+    data = json.loads(path.read_text())
+    data['preferences']['sync'] = {'require_complete_pricing': True}
+    path.write_text(json.dumps(data))
+    monkeypatch.setattr(report.requests, 'Session', lambda: pytest.fail('network session opened'))
+    monkeypatch.setattr(sys, 'argv', ['scionbook_report.py', '--config', str(path), disabled])
+    with pytest.raises(SystemExit) as exc:
+        report.main()
+    assert exc.value.code == 2
+    assert 'complete pricing conflicts' in capsys.readouterr().err
+
+
+@pytest.mark.parametrize('sync', [None, [], {'require_complete_pricing': 'yes'}, {'require_complete_pricing': 1}])
+def test_invalid_sync_preferences_rejected(sync):
+    with pytest.raises(ValueError, match='preferences.sync'):
+        config.validate_preferences({'sync': sync})
+
+
 @pytest.mark.parametrize('saved,override,standalone,expected', [
     ('full', None, False, 'full'), ('public', None, False, 'public'),
     ('full', 'public', False, 'public'), ('public', 'full', False, 'full'),
