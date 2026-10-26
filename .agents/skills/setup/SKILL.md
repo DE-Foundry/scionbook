@@ -1,13 +1,12 @@
 ---
 name: setup
-description: Set up Scionbook for a character name and home world, or a Lodestone profile URL. Resolves the character ID, initializes local preferences and sources, and performs the first refresh. Repository Maintainer only.
+description: Set up Scionbook for a character name and home world, or a Lodestone profile URL. Resolves the character ID, initializes local preferences and sources, and performs the first refresh. Continues in the current player conversation.
 ---
 
 # Setup
 
-Follow AGENTS.md. Establish Repository Maintainer in a fresh chat; in an established Session Planner
-chat, direct setup to a separate Maintainer chat. This request authorizes local initialization and the
-initial refresh, not Git publishing. Read README.md for installation and commands.
+Follow AGENTS.md in the current conversation. This request authorizes local initialization and the
+initial refresh, not Git publishing. No separate chat is needed. Read README.md for installation and commands.
 
 1. Inspect scionbook.json and existing local state before doing anything. One character per checkout.
    Read [gameplay preferences](../../../docs/gameplay-preferences.md). First initialization imports
@@ -33,14 +32,14 @@ initial refresh, not Git publishing. Read README.md for installation and command
    authorizes this first sync. If credentials are unavailable, configuration remains initialized but full
    setup is pending; do not silently switch modes or call it session-ready. Public mode deliberately has no
    private quest history, inventory, or balances. A failed refresh never destroys prior validated state.
-7. Explain the [everyday workflow](../../../README.md#everyday-workflow): Session play/tasks → recap →
-   Maintainer apply → separately requested sync → fresh Session. Use [handoffs](../../../docs/chat-handoffs.md)
-   for the default manual prompts and optional client adapters. Supported app drafts require permissions and Send; the apply draft additionally needs
-   the recap pasted into it. Do not offer a second startup prompt if initial sync already handled it.
+7. After the initial validated sync, reload the saved sources and continue in this conversation.
+   Explain that clear preferences and confirmed reports save locally as supplied, discussion stays open,
+   and later syncs require explicit requests. No recap or handoff is needed for ordinary play.
    Point out inventory, market, gear, and hunt skills. Crafting protection is optional: it needs researched
-   quest_turnins.json, not a fabricated default tier; see [initial setup](../../../docs/crafting-protection.md#first-time-protection).
-   Report the initialized/refreshed sources, their timestamps, public-mode limits, and any remaining gaps.
+   quest_turnins.json, not a fabricated tier; see [initial setup](../../../docs/crafting-protection.md#first-time-protection).
+   Report initialized/refreshed sources, actual timestamps, public-mode limits, and remaining gaps.
+   Offer a practical starting point; detailed gameplay planning follows the user's goals/time.
 
-A configuration save is not a successful refresh. Do not invent progress, completed chores, goals, or
-quest-material protection to populate empty templates. No automatic commit/push. Initial sync may offer
-a fresh Session using a manual prompt or a supported confirmed draft/full-launch route; a draft is not a running skill.
+A configuration save is not a successful refresh. Never invent progress, chores, goals, or crafting
+protection to populate templates. No automatic commit/push or new chat. If runtime capabilities are
+missing, explain the pending setup step without claiming session readiness.

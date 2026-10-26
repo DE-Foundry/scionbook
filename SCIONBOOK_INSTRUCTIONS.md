@@ -1,4 +1,4 @@
-# Scionbook Instructions (v38)
+# Scionbook Instructions (v39)
 
 ## Purpose
 
@@ -9,7 +9,7 @@ Do not assume a main job, expansion, endgame goal, or crafting progression.
 
 ## Sources
 
-Follow AGENTS.md's independent Session Planner / Repository Maintainer roles.
+Follow AGENTS.md's ongoing player workflow and shared-source/private-state boundary.
 Read scionbook.json and the five Scionbook sources: status.json, this file, local memory, local daily/weekly
 checklist, and quest_history.md when available. New public setups have no private history; history retained
 from a previous full-mode snapshot is historical, not fresh.
@@ -17,9 +17,9 @@ Use the newest explicit player report first, then the validated snapshot and dat
 Read fetched_at_utc, notes, and still_not_available before character-dependent advice.
 A prose edit or fresh filename is not a data refresh. State actual snapshot age and any material gaps.
 
-Setup and sync in the Maintainer chat are the only character lookup/refresh workflows. The Session
-Planner uses local state; public game reference browsing is available for mechanics and locations.
-Missing configuration directs to setup. Stale state directs to Maintainer sync without halting advice
+Setup and explicitly requested sync are the character lookup/refresh workflows, available in this
+conversation. Planning uses local state; public reference browsing supports mechanics and locations.
+Missing configuration directs to setup. Stale state identifies a useful sync without halting advice
 supported by available evidence. After a significant inventory cleanup, prior inventory plans are historical.
 
 Only the equipped job's gear is visible. Bag/armory/saddlebag/dresser contents, weekly lockouts,
@@ -32,13 +32,14 @@ player-independent, partial mapping; an unmapped quest does not prove that it un
 ## Skill routing
 
 Read `.agents/skills/<name>/SKILL.md` directly in any assistant; `$name` below is optional shorthand.
-Use docs/assistant-setup.md for capability requirements. Manual prompts are the default handoff;
-client-specific links and launchers apply only to the documented client.
+Use docs/assistant-setup.md for capability requirements. Same-chat local saves are the normal workflow;
+optional new-chat links and launchers apply only to the documented client.
 
-- `$setup`: character discovery, local preferences, initialization, and first refresh (Maintainer).
-- `$sync`: validated refresh and reconciliation (Maintainer).
-- `$start-session`, `$tasks`, `$recap-session`: gameplay planning, conversation-only progress, and handoff.
-- `$apply-recap`: save the user's supplied report without an automatic scrape (Maintainer).
+- `$setup`: character discovery, local preferences, initialization, and first refresh in the current conversation.
+- `$sync`: explicitly requested validated refresh and reconciliation, then same-chat reload.
+- `$start-session`, `$tasks`, `$recap-session`: planning, locally saved progress, and optional summaries.
+- `$save-state`: immediate verified local preferences/reports; discussion alone does not establish a decision.
+- `$apply-recap`: save the user's supplied report without retrieving another chat or automatically scraping.
 - `$inventory-cleanup`: storage review, consolidation, protection, and disposal recommendations.
 - `$market-update`: current listings, prices, sales, and per-retainer listing plans.
 - `$gear-planner`: item-level gates, upgrades, currencies, and acquisition costs.
@@ -59,12 +60,11 @@ available time and preferences; do not impose a fixed MSQ/raid/crafting/collecti
 Only present supported unlocks as runnable. Verify patch-sensitive mechanics, rewards, vendors, and reset
 rules against current sources. Separate sourced facts, player reports, and inference.
 
-Session reports stay in the conversation until a recap is explicitly transferred and applied. After showing
-a recap, offer to apply it and open a fresh Maintainer; after successful sync, offer a fresh Session Planner.
-Check transport before asking, disclose draft/manual steps upfront, and follow docs/chat-handoffs.md.
-Optional Codex desktop draft links prefill the skill; the user selects permissions and presses Send. The apply draft also
-requires pasting the recap; its destination chat offers the Maintainer link only after a verified save.
-Wait for explicit approval. Only the approved recap crosses into apply, via user paste or supported isolated
-transport. Final startup contexts load local files and inherit no transcript. If no transport is available,
-give the manual handoff and describe the launch as pending. Preserve session dates and reset-cycle context. Never manufacture completion, purchases, sales, or balances.
-A recap output is not a save; a save is not a refresh; a refresh is not a commit or push.
+Clear standing preferences and confirmed reports save immediately through save-state; no recap or
+handoff is needed. Discuss options without turning tentative ideas into durable decisions. Current
+preferences belong in configuration, dated outcomes/history in local memory/checklist, and all personal
+workspace settings under ignored local storage. None belong in shared instructions or skills.
+After sync, reload installed sources and reconcile advice in this conversation, preserving newer player
+reports and showing conflicts with lagging data. Preserve report dates and reset-cycle context. Never
+manufacture completions, purchases, sales, or balances. With unavailable write tools, say changes are
+unsaved and provide proposed edits. A save is not a refresh; a refresh is not a commit or push.

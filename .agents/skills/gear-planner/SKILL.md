@@ -26,7 +26,20 @@ a two-handed weapon counts twice; displayed averages are floored. A known upgrad
 delta / 12. Use the interval implied by the displayed average: distinguish guaranteed gate clearance from
 possible clearance when rounding hides the exact total. Never promise an uncertain threshold.
 
+For retainers, default to supporting ventures appropriate to each retainer's current level unless the
+player chooses otherwise. Establish the retainer's job, level, actual equipped items and average item
+level, then verify the intended venture's current requirements. For gathering retainers, check the
+required gathering/perception stats instead of substituting combat item level. Lodestone may not expose
+retainer equipment: obtain the displayed in-game values or equipped-slot details needed to calculate
+them; the official Companion app's equipment view can also supply item details. Save dated reports
+through save-state. Do not substitute the player's gear, held inventory,
+retainer level, or a previous venture's minimum for a measured current item level. If calculating an
+average, verify retainer-specific slot/weapon rules first and label the result as calculated. Check that
+each exact proposed item can be equipped by that retainer; reuse suitable owned gear before purchases.
+Explain the verified gear gap and a practical upgrade path before claiming a matching venture is runnable.
+
 Recommend one practical upgrade path with source, cost, expected benefit, prerequisites, and a stopping
 point. Flag important opportunity costs and unverified weekly balances. Respect spoiler preferences and
 platform/input context. Currency spending, loot, and purchases stay proposed until the player reports them;
-Session Planner uses tasks/recap and Maintainer saves only an explicitly supplied recap.
+clear confirmations and standing preferences save immediately through
+[save-state](../save-state/SKILL.md), without rewriting generated gear/currency evidence.

@@ -1,12 +1,12 @@
 ---
 name: sync
-description: Refresh configured FFXIV character data and reconcile local snapshot, quest history, memory, checklist, and cleanup report. Repository Maintainer only, on an explicit refresh request or initial setup; no automatic commit or push.
+description: Refresh configured FFXIV character data and reconcile local snapshot, quest history, memory, checklist, and cleanup report. In the current conversation on an explicit refresh request or initial setup; no automatic commit or push.
 ---
 
 # Sync
 
-Follow AGENTS.md. Repository Maintainer only; direct Session Planner users to a separate Maintainer chat.
-Read scionbook.json, shared instructions, and existing local sources if present. If configuration is absent,
+Follow AGENTS.md in the current conversation. No role change or handoff is required.
+Read scionbook.json, including preferences.sync, shared instructions, and existing local sources if present. If configuration is absent,
 use [setup](../setup/SKILL.md). Execute only for an explicit data-refresh request or setup's initial refresh.
 A recap's “needs sync” note does not authorize a scrape. Do not read other conversations.
 
@@ -15,11 +15,11 @@ A recap's “needs sync” note does not authorize a scrape. Do not read other c
 Work from the repository root with its Python environment. Inspect existing changes and preserve player
 reports and the previous canonical files. Create ignored `.scionbook-tmp/` for staged output. Verify each
 staged file belongs to this run before installation; a leftover from an earlier attempt is not a new result.
-Finish the validation and reconciliation below before installing or offering the success handoff.
+Finish the validation and reconciliation below before installing and reporting success.
 
 - Full mode: use LODESTONE_COOKIE from the inherited environment without displaying it. If unavailable,
   follow [authentication](../../../README.md#authentication): hidden input in the shell that launches
-  Maintainer or a user-run staged scraper. An export in a separate shell does not update an already-running
+  the assistant or a user-run staged scraper. An export in a separate shell does not update an already-running
   desktop app. Never request the cookie in chat or claim an unrelated terminal export fixed inheritance. Do not put cookies in files, logs,
   command arguments, or chat. Stop on failed authentication and obtain a replacement; do not silently
   fall back to anonymous mode. Network, parser, filesystem, and pricing failures are separate issues.
@@ -27,11 +27,34 @@ Finish the validation and reconciliation below before installing or offering the
   missing quest history, balances, or retainer state. Switching an existing full setup to public mode must
   not erase its private history; retain it as explicitly historical, not fresh.
 
+Include all discovered retainers in authenticated syncs by default: levels, inventory, active listings,
+recent sales, and ventures. Skip them only when the player explicitly requests it; public mode cannot
+retrieve them. A pricing override does not itself authorize skipping retainers. Retainer equipment and
+average item level may require an in-game report: preserve dated reports separately from scraped data,
+and never present a null scraped item level as a measured value or erase a reported value because of it.
+
 Full command:
 `python3 scionbook_report.py --cookie-env --refresh-items --quest-pages 100 --recent-quests 0 --quest-mats-out .scionbook-tmp/quest_mats.json --out .scionbook-tmp/status.json --report .scionbook-tmp/cleanup.md`
 
 Public command:
 `python3 scionbook_report.py --anon --no-retainers --out .scionbook-tmp/status.json --report .scionbook-tmp/cleanup.md`
+
+Check market eligibility and known vendor sale value before requesting prices. Explicit market-prohibited
+stacks need no market lookup; preserve their known vendor value or unknown special uses. Marketable
+items still need market comparison even if they have vendor value. Failed batches shrink to individual
+requests automatically; initial sizes can be set with --price-world-chunk and --price-dc-chunk (minimum 1).
+Assume complete pricing by default; honor explicit saved choices in ignored preferences.sync and
+one-run overrides. Never reduce coverage just because requests fail or the run is slow. If failures
+remain, offer retry, smaller --price-world-chunk/--price-dc-chunk down to 1, or ignore remaining failures
+with --allow-partial-pricing for this run. A user may explicitly choose --no-pricing or --no-retainers;
+with an existing complete-pricing requirement also pass --allow-partial-pricing. Save a different default
+only if the user clearly asks for a standing preference. Unless reduced coverage was chosen, inspect
+pricing_coverage for both scopes:
+all eligible IDs need valid responses, with no failed/unavailable IDs or unresolved eligible names.
+A valid empty market response is no published price, not zero value. Persistent request errors after
+individual retries pause the full-pricing sync; preserve canonical files and let the user choose the
+next step. An explicit ignore choice permits partial pricing with failed items/scopes shown as unknown,
+never zero. Other authentication, identity, history, and protection validation still applies.
 
 Before replacing anything, verify configured character ID/name/home world/data center, actual fresh
 fetched_at_utc, parsed profile and jobs, notes, and still_not_available. A cookie-presence authenticated flag
@@ -80,19 +103,12 @@ source time, meaningful changes, and remaining gaps. Do not dump a cleanup/marke
 Local refresh does not authorize commit/push. Never force-add player data or use this repository,
 its branches, or project forks as a personal-data backup, even when private.
 
-## Offer a fresh session
+## Continue in this conversation
 
-After the complete requested sync succeeds, report its timestamp and gaps, then provide the manual
-Session startup prompt from [chat handoffs](../../../docs/chat-handoffs.md). The user opens a fresh
-read-only chat and submits it; preparing the prompt does not start a session.
-
-Use an optional client adapter only when supported and chosen by the user. Check the transport before
-asking for Yes and disclose draft submission steps or full-launch behavior. Codex-specific routes are in
-[the Codex integration](../../../docs/integrations/codex.md); do not offer those links in other clients.
-Reuse approval already given for this handoff. No or silence means no action. Runtime rejection falls
-back to manual steps, never a sandbox bypass.
-
-Pass only the startup instruction; the fresh context reads the refreshed files itself. No transcript
-transfer, fork/resume, or same-chat role switch. Do not offer this success transition when validation or
-reconciliation failed. Disclose limits of a successful public refresh. Keep sync saved, prompt/draft
-prepared, chat opened, and workflow started separate.
+After complete validation, installation, and reconciliation, re-read the installed configuration and
+sources and update current advice in this conversation. Invalidate older inventory/market plans that
+no longer match. Preserve newer explicit player reports and temporary choices, with conflicts visible;
+a newer fetched_at_utc does not prove that lagging Lodestone data supersedes a reported outcome.
+Report the real snapshot time, meaningful changes, and any user-accepted pricing gaps. Continue the
+existing discussion or play without requiring a new chat, recap, startup prompt, or context reset.
+If this was development/data work, do not automatically start a gameplay plan.

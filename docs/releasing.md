@@ -219,7 +219,7 @@ visibility, review the exact files and history being released. Local preparation
 ## Release review
 
 - Run the offline test suite and inspect CI results for the intended commit.
-- Walk through the provider-neutral setup and manual recap handoff. State which client integrations and
+- Walk through provider-neutral setup, immediate local saves, same-chat sync/reload, and optional fresh startup. State which client integrations and
   live services were actually tested; offline fixtures do not certify live Lodestone parsing.
 - Review tracked files, assets, generated reports, fixtures, author metadata, branches, and tags for
   private player/account information and secrets. Confirm ownership and redistribution rights for assets.

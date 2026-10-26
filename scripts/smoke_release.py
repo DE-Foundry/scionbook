@@ -18,6 +18,7 @@ def smoke():
             archive.extractall(root / 'extracted')
         project = root / 'extracted/scionbook-0.1.0'
         for name in ['.agents/skills/setup/SKILL.md', '.claude/skills/setup/SKILL.md',
+                     '.agents/skills/save-state/SKILL.md', '.claude/skills/save-state/SKILL.md',
                      '.codex/config.toml', 'templates/SCIONBOOK_MEMORY.md', 'README.md']:
             if not (project / name).is_file():
                 raise RuntimeError(f'Package is missing {name}')
@@ -29,10 +30,10 @@ def smoke():
         subprocess.run([str(python), '-m', 'pip', 'install', '-r', 'requirements.txt'],
                        cwd=project, env=env, check=True)
         for script in ['scionbook_setup.py', 'scionbook_report.py', 'scionbook_quest_history.py',
-                       'scionbook_quest_mats.py', 'scionbook_handoff.py']:
+                       'scionbook_quest_mats.py', 'scionbook_handoff.py', 'scionbook_state.py']:
             subprocess.run([str(python), script, '--help'], cwd=project, env=env,
                            check=True, stdout=subprocess.DEVNULL)
-        print('Extracted ZIP installs and all five CLI entry points start without Git or player data.')
+        print('Extracted ZIP installs and all six CLI entry points start without Git or player data.')
 
 
 if __name__ == '__main__':

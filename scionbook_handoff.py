@@ -105,12 +105,12 @@ def portable_prompt(role):
     skill = skills[role]
     prompt = f"Read AGENTS.md and follow .agents/skills/{skill}/SKILL.md."
     if role == "session":
-        prompt += " Use a fresh read-only chat. Keep new gameplay reports in this conversation."
+        prompt += " Use local read/write access. Continue discussion, verified local saves, and requested syncs in this conversation."
     elif role == "maintainer":
         prompt += " Use a fresh chat with repository read/write access. Do not start gameplay or sync automatically."
     else:
         prompt += (
-            " Use a fresh chat with repository read/write access. Apply only the recap below and "
+            " Use local read/write access. Apply only the recap below and "
             "verify the saved files. If it is missing or needs clarification, stop and ask. "
             "Do not sync, commit, or push.\n\nRecap to apply:\n")
     return prompt
@@ -206,11 +206,10 @@ def app_draft_link(role, repo=REPO):
     prompt = f"Use ${skill} from .agents/skills/{skill}/SKILL.md."
     if role == "apply":
         prompt += (
-            " Apply only the recap I paste below. After verifying that it was saved "
-            "or already applied, provide a fresh $start-maintenance draft link using "
-            "docs/chat-handoffs.md, with no recap or transcript in the follow-up. "
-            "If the recap is missing or the save needs input or fails, stop and explain "
-            "what is needed; do not offer the follow-up yet. Do not sync, commit, or push."
+            " Apply only the recap I paste below and verify the local save. "
+            "If the recap is missing or the save needs input or fails, explain what is needed. "
+            "After success, continue in this conversation; no new chat is required. "
+            "Do not sync, commit, or push."
             "\n\nRecap to apply:\n")
     return "codex://threads/new?" + urlencode({"path": str(root), "prompt": prompt}, quote_via=quote)
 

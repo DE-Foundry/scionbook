@@ -1,9 +1,29 @@
 ## Changes and compatibility
 
+The player workflow now stays in one conversation across setup, sync, discussion, planning, and local
+saves. Clear standing preferences and confirmed reports save immediately through save-state; recaps
+and fresh chats are optional. Interactive Session launchers now request write access with normal host
+approval controls. Existing read-only chats need their host's normal permission change to save; where
+unavailable, changes stay explicitly unsaved. Optional isolated recap proposals remain restricted.
+
+No player-file schema migration or new scrape is required. Restart/reload the shared workflow instructions
+and saved sources after updating. Existing reports/preferences are preserved; ambiguous old preference
+prose is not automatically migrated. scionbook_state.py adds validated same-chat persistence without an
+AI-provider dependency. All real-data checks and artifacts stay local and ignored.
+
+Authenticated refreshes now assume complete pricing unless explicitly overridden. Persistent failures
+let the user retry, reduce batches down to one, or ignore remaining gaps with --allow-partial-pricing.
+That one-run option does not alter the saved default. Explicit --no-pricing/--no-retainers choices still
+work; with a saved full-pricing requirement, also pass --allow-partial-pricing. Public mode is unchanged.
+Failed required-pricing runs leave snapshot/report/protection outputs untouched. See README.md for
+coverage semantics. To roll back, retain the prior application with its matching local-state backup;
+older versions can still read the unchanged player-file formats.
+
+
 Automated CLI recap handoffs now ask the model for proposed changes. Python validates permitted player
 files and preference fields, installs them, and verifies saved bytes before opening the next chat.
-Existing player files need no migration. Manual handoffs and desktop drafts retain their normal client
-permissions; the deterministic installer applies to the automated CLI route.
+Existing player files need no migration. Manual saves retain their normal client permissions; same-chat helper saves and automated CLI
+proposals use the deterministic installer.
 
 Proposal runs suppress user client settings and unrelated environment variables. Use a current Codex or
 Claude Code CLI that supports the documented restriction flags. Set `SCIONBOOK_MODEL` explicitly if you
