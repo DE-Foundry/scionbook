@@ -3,7 +3,7 @@
 ## Shared code and local state
 
 The project name is Scionbook. Product-owned modules, commands, configuration, staging, and cache paths
-use scionbook; FFXIV refers to the game or upstream resources. Roles are Session Planner and Repository Maintainer.
+use scionbook; FFXIV refers to the game or upstream resources. Session Planner handles the ongoing player workflow; Repository Maintainer handles explicit application changes.
 There are no compatibility aliases for unreleased project names.
 One character per checkout. No hardcoded character, server, retainer, account, platform, timezone,
 progression tier, or remote repository. Setup resolves identity and saves scionbook.json locally.
@@ -35,18 +35,20 @@ per-craft inputs as per-output quantities; round required crafts up using the ve
 ## Workflow boundaries
 
 Python data tools must not depend on an AI provider or model API. Shared Markdown workflows support
-explicit file-based invocation without native skill syntax. Manual prompt/recap handoffs are the portable
+explicit file-based invocation without native skill syntax. Direct file-based workflows are the portable
 baseline; client-specific configuration, URL schemes, permission flags, and launchers are optional adapters
 documented under docs/integrations/. Never apply one client's controls to another or claim a text prompt
 enforces permissions. Document capability limits instead of claiming universal client compatibility.
 
-Session and Maintainer chats remain independent. After showing a recap, offer the available confirmed
-apply-to-Maintainer handoff; after successful sync, offer a fresh Session Planner. Draft links require user
-submission; supported full-launch transports run only after explicit Yes. Forward only the approved recap to apply; subsequent startup uses local files and
-no old transcript. Check transport before asking; optional Codex desktop deep links prepare a fresh composer but do not
-send the prompt or select permissions. Apply drafts also require the user to paste the recap. The destination
-Apply Recap chat provides the follow-up draft only after a verified save. Disclose those steps upfront. Use docs/chat-handoffs.md. Neither
-compaction, resume/fork, nor invoking a different skill resets context. Runtime permissions still apply.
+The normal player workflow is one ongoing conversation with local write access: setup, sync,
+discussion, planning, and verified personal saves. Clear standing preferences and confirmed reports
+save immediately through save-state; speculative discussion and session-only choices do not become
+durable decisions. A recap is an optional summary/import format, never a required save/handoff step.
+Application source changes require an explicit maintenance request. Shared skills never acquire player
+preferences or workspace paths. New chats and legacy adapters remain optional; a reload is not a context
+reset. With read-only/upload-only access, prepare unsaved proposals and disclose the capability limit.
+After validated sync, reload sources and reconcile advice in the same conversation, preserving newer
+player reports and showing any conflicts with lagging fetched data. Do not launch a new chat automatically.
 Specialist skills own detailed cleanup, market, gearing, and hunt procedures. Core instructions route to them.
 Hunt plans default to practical travel order, grouping nearby suitable targets and separating skipped or
 conditional marks; verify travel dependencies and state the proposed start when the current location is unknown.
@@ -58,6 +60,27 @@ Never commit or push player data, including to private branches. Sync only saves
 
 ## Inventory and market recommendations
 
+Authenticated syncs include all discovered retainers unless the player explicitly opts out. Include
+their levels, holdings, listings, recent sales, and ventures; public mode cannot supply private retainer
+data. Pricing exceptions do not imply permission to skip retainer collection.
+
+Unless the player chooses otherwise, include retainer upkeep in gameplay planning and aim to keep each
+retainer on ventures appropriate to its current level, respecting explicit player priorities and time.
+Establish its job, level, actual equipped gear/average item level, and the intended venture's requirements
+before recommending upgrades. If the source cannot supply equipment, obtain an in-game report rather
+than stopping at an unavailable-field notice or assuming level proves eligibility. Verify each exact
+item is retainer-equippable, consider suitable owned gear first, and keep dispatches/upgrades proposed
+until confirmed. Reported equipment stays in ignored local state with its date/source, not shared text
+or hand-edited scraper output.
+
+Check item market eligibility and known NPC sale value before requesting market prices. Explicit
+market-prohibited stacks need no market request; missing prices never prove an item is unsellable.
+Reduce failed pricing batches down to individual requests and reuse smaller successful sizes.
+Sync timing/completeness choices belong in ignored configuration under preferences.sync. Assume complete pricing unless the user chooses otherwise. Persistent failures offer retry,
+smaller batches down to one, or explicit acceptance of remaining gaps for this run. Do not silently
+relax coverage for speed or turn a one-run choice into a standing preference. Ignoring pricing failures
+does not waive other sync validation. Preserve existing files until the chosen refresh validates.
+
 Each market-board listing holds at most 99 items, or the item's lower stack limit. Distinguish total stock
 from per-listing quantities and count each split listing against its retainer's available slots. Smaller
 stacks are a valid selling strategy; weigh demand and value per slot rather than always consolidating.
@@ -68,20 +91,14 @@ local sale speed from it, or recommend the source World/DC as a selling destinat
 Missing market prices do not erase a known vendor sale value. Compare provisional DC references against
 vendor proceeds too; any resulting proceeds estimate is vendor-only. NPC purchase prices trigger a warning
 for either price source, never an automatic cap, because shop access may be gated.
-Check known market eligibility and vendor sale values before market pricing. Exclude market-prohibited
-items from price requests even when the global marketable catalog is unavailable; a missing vendor
-value alone does not establish market prohibition. After failed or partial pricing batches, ask before
-retrying missing items with a smaller batch size (1 item). Noninteractive runs must expose the question
-for the Maintainer to ask; no or silence does not authorize singleton recovery. Bound approved recovery
-and preserve successful prices, known vendor values, and disclosed unknowns.
-Share retry consent across home-World/DC requests and support an explicit CLI decline that suppresses
-terminal prompts. Agent sync commands decline scraper prompts and handle consent in chat. Recover only
-missing prices from saved snapshot context after approval, preserving the character source timestamp,
-successful prices, and saved material protections; record pricing recovery time separately. Do not
-rescrape Lodestone or reconcile crafting/history merely to recover pricing. Summarize singleton failures.
-Persist only numeric valuation inputs and HQ/unit-price samples from market responses, excluding
-third-party names/IDs and unused metadata. Trim existing raw recovery contexts when writing recovered
-outputs, and keep duplicated inventory inputs limited to verdict/protection/report fields.
+
+Approved pricing-only recovery reuses saved snapshot context, successful prices, vendor values,
+and material protections. Preserve character source time, record recovery time separately, and recompute
+coverage under the current full-pricing default before writing. Never rescrape character/history/crafting
+merely to fill missing prices. A failed full-pricing run writes no new recovery source; use a previously
+accepted partial snapshot only with its actual provenance. Explicit retry declines suppress fallback
+without silently accepting gaps. Persist numeric valuation inputs and HQ/unit-price samples only,
+excluding third-party identities and unused metadata; trim legacy raw contexts in recovered outputs.
 
 ## Credentials and output
 

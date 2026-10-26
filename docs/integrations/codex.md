@@ -1,28 +1,35 @@
 # Optional Codex integration
 
-Scionbook does not require Codex. Use the [portable workflow](../assistant-setup.md) with any
-assistant that meets its capability requirements. This page documents the existing Codex adapter;
-these commands and URL schemes are not instructions for other clients.
+Scionbook works through [portable workflows](../assistant-setup.md). Codex-specific configuration and
+launchers are conveniences; ordinary use does not require a new-chat API, draft link, or CLI handoff.
+Use the user's configured model. .codex/config.toml disables automatic/global memory and subagents.
 
-Codex-specific behavior lives in `.codex/config.toml`, the default Codex mode of
-`scripts/scionbook-chat`, and the `draft` action / Codex CLI mode of `scionbook_handoff.py`.
-The shared CLI helpers also support Claude Code; see [CLAUDE.md](../../CLAUDE.md). The project config disables automatic memory and
-multi-agent tools for new trusted chats; it does not configure another assistant or change an existing chat.
-Use the user's configured model. The interactive launchers require Bash and Codex CLI:
+## Interactive launchers
+
+Run in a user-accessible terminal with Bash and Codex CLI:
 
 ```bash
 bash scripts/scionbook-chat session
 bash scripts/scionbook-chat maintainer
 ```
 
-Run these in a user-accessible terminal. The Session launcher requests read-only/never permissions;
-Maintainer requests workspace-write/on-request. Native `$skill-name` invocation is optional shorthand.
-Follow the [shared handoff contract](../chat-handoffs.md) for consent and save verification.
+Both request workspace-write/on-request. The Session Planner now saves local preferences/progress and
+can run requested syncs. Maintainer handles explicit application work. Normal host approval controls
+remain active; no permission bypass is used. Existing read-only chats need the host's normal write
+permission change for saving, not a role handoff. If that is unavailable, disclose unsaved changes.
+Claude Code mappings are in [CLAUDE.md](../../CLAUDE.md).
 
-## Codex desktop draft links
+## Same-chat persistence
 
-The documented `codex://threads/new` link accepts URL-encoded `path` (absolute repository directory) and
-`prompt` (initial composer text). Generate the exact URL without opening a terminal or starting an agent:
+Use [save-state](../../.agents/skills/save-state/SKILL.md) and scionbook_state.py. Prepare an original
+snapshot before composing an edit; apply the proposal through stdin, then verify the receipt. This
+calls no model or external service. It changes only permitted local player files and checks Git privacy.
+The host still has its configured filesystem permissions; the helper is not a sandbox for other tools.
+
+## Optional desktop drafts and legacy CLI
+
+The existing `codex://threads/new` adapter accepts a URL-encoded local path and startup prompt.
+Generate a draft only when the user wants another chat:
 
 ```bash
 python3 scionbook_handoff.py draft --role session
@@ -30,61 +37,13 @@ python3 scionbook_handoff.py draft --role maintainer
 python3 scionbook_handoff.py draft --role apply
 ```
 
-Present the returned URL as a clickable Markdown link, e.g. **Open Session Planner**. On click, the app
-opens a fresh chat composer in that repository. The user selects read-only for Session or workspace-write
-for Maintainer and presses Send. These query parameters do not set runtime permissions or send the prompt;
-do not invent `sandbox` or auto-submit parameters. A prompt is not permission enforcement.
-Do not substitute a hidden PTY or report a prepared link as a launched/running session. The exact skill
-spelling is `$start-session`, with no space after `$`. Native app controls need not be exposed to offer a link.
+The user selects workspace-write and presses Send. Apply drafts require the actual recap pasted after
+the label. No permission or auto-submit query parameters are provided; the link does not save anything.
+After applying a recap the conversation can continue; no follow-up draft is required. Never put player
+reports or credentials in URLs. Local paths in generated links stay conversational, never shared source.
 
-After sync, use the session draft. For recap, the apply draft prefills instructions for applying the recap
-and producing the post-save Maintainer link, plus a “Recap to apply:” label. The user must paste the displayed
-recap there; the label alone is not content to save. Opening the draft does not apply anything. Only the
-Apply Recap chat, after verifying the save, provides the maintainer draft. Keep recap
-contents out of URLs and process arguments. A supported isolated apply transport may still automate the save,
-but a draft follow-up requires Send and must be described accordingly.
-
-[Official desktop deep-link documentation](https://learn.chatgpt.com/docs/reference/commands#chats).
-
-## Codex CLI
-
-Use an available, documented host action that creates genuinely new user-visible chats with the correct
-repository and permissions. If it can only create a chat but cannot run and verify an isolated apply step,
-do not claim the full recap sequence was automated. Never invent a tool, type `/new` as ordinary assistant
-text and claim it executed, use `/compact`, fork/resume a chat, or edit session databases.
-
-The CLI helper implements the full sequence in a **user-accessible terminal**:
-
-```bash
-# Paste the approved recap and end input with EOF, or pipe the exact text on stdin.
-python3 scionbook_handoff.py recap --confirmed
-
-# After a successful sync and explicit Yes:
-python3 scionbook_handoff.py session --confirmed
-```
-
-`--confirmed` records an answer already received; it does not replace asking. Do not pass recap text as
-shell command syntax, interpolate it into an unquoted heredoc, or put it in process arguments. Use structured
-stdin transport where available. The helper requests a fresh, ephemeral, read-only Codex proposal from
-selected snapshots. Python validates the allowlisted changes, saves them, verifies the bytes, and only
-then launches the separate interactive Maintainer. It refuses to start without a terminal, even before
-proposal generation. Temporary schemas/results live outside the checkout and are removed after the run;
-ignored transaction backups remain only after an interrupted installation. The proposal uses never approval,
-disabled shell/web tools, and suppressed user settings; set `SCIONBOOK_MODEL` to choose its model.
-The follow-up Maintainer uses workspace-write/on-request. Session uses read-only/never. No sandbox bypass
-is used. See [instruction security](../instruction-security.md) for client/authentication limits and recovery.
-
-The Session Planner has a narrow exception to invoke this confirmed handoff transport, subject to runtime
-permissions. It may not use that exception to make arbitrary writes or start other work. Never escalate a
-read-only session into a writer to bypass a launcher rejection; use the manual path if the host blocks it.
-A hidden tool PTY is not a user-facing chat. Do not run an unattended nested interactive CLI from an app tool.
-
-If no supported host action, desktop draft link, or user-accessible CLI transport is available, explain this
-before asking for a transition and provide the
-exact pending handoff: open a fresh Maintainer chat, submit `$apply-recap` plus the approved recap, and after
-it confirms the save open another fresh chat with `$start-maintenance`. After sync, open a fresh read-only
-chat and submit `$start-session`. Clearly distinguish prepared, applied, and launched states. This fallback
-requires user action; do not say the automatic transition happened.
-
-References: [CLI execution and structured output](https://learn.chatgpt.com/docs/developer-commands?surface=cli),
-[separate chats and new CLI sessions](https://learn.chatgpt.com/docs/projects).
+The optional `scionbook_handoff.py recap --confirmed` CLI still performs an isolated proposal, verified
+save, and separate Maintainer launch for users choosing that legacy route. It requires a user-accessible
+terminal and explicit launch approval. Proposal processes retain their restricted read-only settings;
+only normal interactive player sessions gain write access. See [continuation guidance](../chat-handoffs.md)
+and [instruction security](../instruction-security.md) for boundaries and recovery.

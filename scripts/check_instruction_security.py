@@ -13,7 +13,8 @@ import unicodedata
 MAX_FILE = 2_000_000
 MAX_TREE = 20_000_000
 PROTECTED = ("scripts/check_instruction_security.py", ".github/workflows/", "scionbook_handoff.py",
-             "scionbook_recap.py", "tests/test_instruction_security.py", "tests/test_recap_security.py")
+             "scionbook_recap.py", "scionbook_state.py", "tests/test_state.py",
+             "tests/test_instruction_security.py", "tests/test_recap_security.py")
 RISK = re.compile(r"dangerously[-_]\w+|bypassPermissions|danger-full-access|"
                   r"(?:curl|wget)\b[^\n]*\|\s*(?:ba)?sh|"
                   r"ignore (?:all |previous |prior )*instructions|"
@@ -24,7 +25,7 @@ URL = re.compile(r"https?://[^\s<>\[\]`\"')]+", re.I)
 def relevant(name):
     return (PurePosixPath(name).suffix.lower() in {".md", ".toml", ".json", ".yaml", ".yml"}
             or name.startswith((".agents/", ".claude/", ".codex/", ".github/", "scripts/"))
-            or name in {"scionbook_handoff.py", "scionbook_recap.py"})
+            or name in {"scionbook_handoff.py", "scionbook_recap.py", "scionbook_state.py"})
 
 
 def git(repo, *args):

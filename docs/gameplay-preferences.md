@@ -19,7 +19,7 @@ apply the relevant saved priorities and routines. Use this precedence per topic:
 3. Dated local memory or legacy `preferences.goals` for topics not covered there.
 
 A clearly newer dated preference report can supersede an older configured value;
-flag the discrepancy for recap reconciliation rather than silently losing the report.
+reconcile the explicit durable change locally rather than deferring it to a recap.
 If chronology or durable intent is unclear, retain the baseline and ask only when it
 matters. Do not convert a one-off activity, suggestion, or completed goal into a new
 standing preference. Explicit priority changes replace the ordered list as supplied;
@@ -32,33 +32,38 @@ job/level conditions. Verify activity unlocks, eligibility, current rewards, res
 and queue compatibility before presenting actions as available. Preferences do not
 prove access or completion. Never substitute the equipped job for the intended job.
 
-## Saving and recap
+## Discussion and immediate saves
 
-Session Planner tracks durable changes, session-only choices, and dated outcomes
-separately in conversation; it never writes. Recap includes only changed durable
-preferences, their report date, scope, replacement/removal intent, and enough detail
-for an independent Maintainer. Session-only choices are context, explicitly labeled
-as such. Completed outcomes remain a separate category.
+Use [save-state](../.agents/skills/save-state/SKILL.md) in the current conversation as soon as the user
+clearly establishes a standing preference. The instruction itself authorizes the local save; no recap,
+new chat, or repeated confirmation is needed. Preserve identity and unrelated settings, validate, verify
+saved bytes, and use the preference immediately. Explicit sync timing/completeness choices live under
+preferences.sync, separate from gameplay priorities. Full pricing is assumed when no choice is saved.
 
-Maintainer applies explicitly supplied durable changes to configuration, preserving
-unrelated fields and identity. Local memory may hold dated change history, with old
-values clearly superseded; configuration is the current baseline, not duplicated prose.
-Validate configuration and re-read saved bytes. Reapplying an identical recap is a no-op.
-A preference-only save needs no completion section, snapshot edit, or refresh. It never
-authorizes sync, commits, pushes, or a role switch.
+Discussing alternatives is welcome and does not establish a preference. “I might focus on crafting” is
+exploration; “make crafting my main priority” is a durable change. “Crafting just tonight” is temporary.
+Ask only if ambiguity affects what would be persisted, and do not delay unrelated discussion.
+
+Configuration is the current baseline. Local memory may retain useful dated change history, with old
+values clearly superseded; do not keep competing current preference lists there. Confirmed outcomes
+are dated records separate from preferences and reusable routine boxes. A completed objective does not
+silently create another standing goal. Repeated identical changes are no-ops.
+
+A recap can summarize saved changes or import an explicitly supplied report. It is not required for
+saving. A preference-only save needs no completion section, snapshot edit, refresh, commit, or push.
 
 ## Before character setup
 
-If `scionbook.json` is absent, an explicitly authorized Maintainer preference save may
+If `scionbook.json` is absent, an explicit gameplay preference may
 use ignored `local/gameplay-preferences.json`, containing only a `preferences` object
 with an optional `gameplay` object.
 Other preference keys in this seed are rejected; configure those after setup. Duplicate
-JSON keys and non-finite values are rejected in seeds, configuration, and recaps.
+JSON keys and non-finite values are rejected in seeds, configuration, and local save proposals.
 Do not fabricate identity or initialize memory/checklist completion records. First setup
 validates and imports this seed into configuration alongside normal defaults. Reruns
 ignore the seed entirely and preserve configured preferences. Once configuration exists,
 the seed is historical, not a second live source. Missing character sources still require
-setup in a Maintainer chat before a gameplay session; a seed does not make it ready.
+setup in the current conversation before snapshot-based gameplay planning; a seed does not make it ready.
 The automated recap adapter still requires existing configuration and retains its
 existing output allowlist; it cannot save a pre-setup seed.
 

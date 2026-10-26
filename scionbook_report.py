@@ -38,7 +38,7 @@ from datetime import datetime, timezone
 
 import requests
 from bs4 import BeautifulSoup
-from scionbook_config import CONFIG_PATH, parse_json, resolve_identity, resolve_mode
+from scionbook_config import CONFIG_PATH, load_config, parse_json, resolve_identity, resolve_mode
 from scionbook_http import LODESTONE, LODESTONE_HEADERS, HTTP_HEADERS
 
 BASE = f"{LODESTONE}/character"
@@ -331,11 +331,21 @@ def attribute_item_level(character, jobs, buckets):
 # --------------------------------------------------------------------------- #
 
 def split_category(text):
-    """'Category (Title)' -> (category, title). Split on the FIRST paren:
-    titles can themselves contain parens."""
+    """Separate the final top-level title group, retaining nested parentheses
+    in either the category label or the title itself."""
     if text and text.endswith(")") and "(" in text:
-        i = text.index("(")
-        return text[:i].strip(), text[i + 1:-1].strip()
+        depth, start = 0, None
+        for i, char in enumerate(text):
+            if char == "(":
+                if depth == 0:
+                    start = i
+                depth += 1
+            elif char == ")":
+                depth -= 1
+                if depth < 0:
+                    return None, text
+        if depth == 0 and start is not None:
+            return text[:start].strip(), text[start + 1:-1].strip()
     return None, text
 
 
@@ -847,8 +857,8 @@ def parse_venture(soup):
 
 def scrape_retainer(char_id, rid, session, dump_dir=None, verbose=False):
     out = {"retainer_id": rid, "name": None, "job": None, "level": None,
-           # Null by design: retainer gear/ilvl does not exist outside the game
-           # client. The gap should read "not available", not "missing".
+           # Not exposed by Lodestone retainer pages. Equipment from an in-game
+           # or Companion-app report belongs in separately dated local state.
            "item_level": None, "active_venture": None,
            "inventory": [], "market_listings": [], "recent_sales": [],
            "sale_rows_dropped": 0,
@@ -1026,120 +1036,138 @@ class PricingRetryConsent:
         return self.decision
 
 
+def pricing_item_ids(rows, marketable):
+    """Only market-eligible item types need market prices; vendor values
+    already come from the Lodestone tooltip. Unknown eligibility stays open
+    to lookup, but an explicit Market Prohibited flag wins for that stack.
+    """
+    return sorted({r["item_id"] for r in rows
+                   if r.get("item_id") and r.get("market_allowed") is not False
+                   and (marketable is None or r["item_id"] in marketable)})
+
+
 def fetch_prices(ids, scope, session, chunk=50, listings=50, entries=50,
-                 attempts=3, retry_single_items=None, notes=None,
-                 retry_consent=None, absent_ids=None):
-    # Batches of 100 reliably 504 under current Universalis load; 50 comes
-    # back in a few seconds *for a single-world scope*. A DC/cross-world
-    # scope aggregates every world in it and is measurably heavier. The
-    # failure is a *server-side ~10s gateway timeout*, not client-side and
-    # not really load: measured 2026-09-09 against "a data center", batches that
-    # exceed it 504 with a 16-byte "error code: 504" body after ~10.2s,
-    # while batches that finish come back in 2-5s. Chunk size is therefore
-    # the lever, and it is a sharp one - over 10 trials each on cold ids:
-    #
-    #     chunk=10   2/5 succeeded
-    #     chunk=5    3/5
-    #     chunk=4   10/10   ~4.5s/request
-    #     chunk=3    9/10   ~3.5s/request
-    #
-    # Two DC passes at chunk=10 (09-09 05:24Z and 10:20Z) resolved 30/245
-    # and 7/245 items, leaving little DC comparison data. Hence chunk=4
-    # for DC callers. The `fields` parameter does NOT help - it trims the
-    # response but not the work behind it, and fields-limited batches 504
-    # at the same rate. The lighter /api/v2/aggregated/ endpoint answers in
-    # ~1s but carries no recentHistory or listings array, so it would strip
-    # history_median (the preferred price source) and cheapest_current_ask
-    # (the undercut logic) off every DC row and fall back to minPrice,
-    # which this pipeline deliberately distrusts - a reliability win paid
-    # for in price quality, which is the wrong trade here.
-    #
-    # Expect the odd gap regardless; num()/pick_unit_price() already treat
-    # missing data as "no data" rather than "zero", so a partial DC fetch
-    # degrades to "no DC comparison for this item" rather than a wrong price.
-    #
-    # listings/entries=5 (the pre-fix default) is not enough to compute
-    # anything robust: on a thin market the single cheapest *current*
-    # listing can be 10-20x what the item has actually sold for recently
-    # (confirmed live, 2026-08-28 - see verdict_for). 50 was measured at
-    # ~9.5s/batch for a single-world scope, well inside the timeout below.
+                 attempts=3, coverage=None, retry_single_items=None, notes=None,
+                 retry_consent=None, absent_ids=None, automatic_retries=True):
+    """Keep listings/history detail while reducing failed batches to singles.
+
+    Learn the smaller batch size for the rest of this scope instead of
+    exhausting retries on every oversized batch. Retry remaining failures
+    individually; an HTTP/parse failure never establishes market eligibility.
+    """
+    if chunk < 1 or attempts < 1:
+        raise ValueError("pricing chunk and attempts must be positive")
     out = {}
-    ids = sorted(set(i for i in ids if i))
     absent = absent_ids if absent_ids is not None else set()
 
     def note(message):
         print(f"  ! {message}", file=sys.stderr)
         if notes is not None:
             notes.append(message)
+    ids = sorted(set(i for i in ids if i))
 
-    def fetch_batch(batch, tries, quiet=False):
-        """Fetch one batch into `out`. Returns True if it landed."""
+    def fetch_batch(batch, tries):
         url = (f"{UNIVERSALIS}/{scope}/{','.join(str(b) for b in batch)}"
                f"?listings={listings}&entries={entries}")
         for attempt in range(1, tries + 1):
             try:
                 r = session.get(url, timeout=90)
-                # A batch 404 cannot establish absence for every member.
-                # Neither kind of 404 proves the item is untradeable.
-                if r.status_code == 404:
-                    if len(batch) == 1:
-                        absent.update(batch)
+                if r.status_code == 404 and len(batch) == 1:
+                    absent.update(batch)
                     return False
                 r.raise_for_status()
                 data = r.json()
                 if not isinstance(data, dict):
                     raise ValueError("expected a pricing object")
                 items = data.get("items")
-                if not isinstance(items, dict):
-                    items = {str(data["itemID"]): data} if data.get("itemID") else {}
-                # Missing/malformed entries remain eligible for an approved
-                # retry; only requested IDs with usable object shapes count.
-                parsed = {iid: items[str(iid)] for iid in batch
-                          if isinstance(items.get(str(iid)), dict)
-                          and items[str(iid)]}
-            except Exception as e:
+                if isinstance(items, dict):
+                    for key, entry in items.items():
+                        iid = int(key)
+                        if iid in batch and isinstance(entry, dict) and entry.get("itemID") == iid:
+                            out[iid] = entry
+                elif data.get("itemID") in batch:
+                    out[data["itemID"]] = data
+                else:
+                    raise ValueError("pricing response has no item data")
+                return all(i in out for i in batch)
+            except Exception as exc:
                 if attempt == tries:
-                    if not quiet:
-                        print(f"  ! pricing batch failed ({e}); continuing",
-                              file=sys.stderr)
+                    print(f"  ! {scope}: pricing {batch} failed ({exc})",
+                          file=sys.stderr)
                     return False
                 time.sleep(1.5 * attempt)
-                continue
-            out.update(parsed)
-            return True
         return False
 
-    for i in range(0, len(ids), chunk):
-        if not fetch_batch(ids[i:i + chunk], attempts, quiet=(chunk == 1)):
-            time.sleep(1.0)
-        time.sleep(0.3)
+    if automatic_retries and retry_single_items is None and retry_consent is None:
+        batch_size = chunk
+        pending = ids[:]
+        processed = 0
+        while pending:
+            batch = pending[:batch_size]
+            ok = fetch_batch(batch, 1 if len(batch) > 1 else attempts)
+            if not ok and len(batch) > 1:
+                batch_size = max(1, len(batch) // 2)
+                print(f"  {scope}: reducing pricing batch size to {batch_size}",
+                      file=sys.stderr)
+                pending = [i for i in pending if i not in out and i not in absent]
+                continue
+            pending = pending[len(batch):]
+            processed += len(batch)
+            if processed >= 10 or not pending:
+                print(f"  {scope}: received {len(out)}/{len(ids)} item responses; "
+                      f"{len(pending)} left in first pass", file=sys.stderr)
+                processed = 0
+            time.sleep(0.3)
 
-    # A slow item can time out its neighbours. Single-item requests can
-    # recover them, but potentially add many requests: ask before that work.
-    missing = [i for i in ids if i not in out and i not in absent]
-    if missing and chunk > 1:
-        consent = retry_consent or PricingRetryConsent(retry_single_items)
-        approved = consent.approve()
-        if approved:
-            print(f"  retrying {len(missing)} unpriced item(s) in {scope}, "
-                  "batch size 1...",
-                  file=sys.stderr)
-            for iid in missing:
-                fetch_batch([iid], attempts, quiet=True)
+        for round_no in (1, 2):
+            missing = [i for i in ids if i not in out and i not in absent]
+            if not missing:
+                break
+            print(f"  {scope}: retrying {len(missing)} item(s) individually, "
+                  f"pass {round_no}...", file=sys.stderr)
+            for number, iid in enumerate(missing, 1):
+                fetch_batch([iid], attempts)
+                if number % 10 == 0 or number == len(missing):
+                    print(f"  {scope}: retry progress {number}/{len(missing)}; "
+                          f"received {len(out)}/{len(ids)}", file=sys.stderr)
                 time.sleep(0.2)
-        elif approved is None:
-            note(f"{scope}: smaller-batch pricing retry not performed. "
-                 "Ask the user whether to retry with batch size 1; after approval, "
-                 "use --pricing-only-from with --retry-pricing-single-items.")
-        else:
-            note(f"{scope}: smaller-batch pricing retry not approved; "
-                 "available results retained.")
 
-    still = [i for i in ids if i not in out and i not in absent]
-    if still:
-        note(f"{scope}: {len(still)}/{len(ids)} item(s) remain unpriced: "
-             f"{still[:10]}{'...' if len(still) > 10 else ''}. "
-             "Missing prices do not establish market prohibition or zero value.")
+    else:
+        for i in range(0, len(ids), chunk):
+            if not fetch_batch(ids[i:i + chunk], attempts):
+                time.sleep(1.0)
+            time.sleep(0.3)
+
+        # A slow item can time out its neighbours. Single-item requests can
+        # recover them, but potentially add many requests: ask before that work.
+        missing = [i for i in ids if i not in out and i not in absent]
+        if missing and chunk > 1:
+            consent = retry_consent or PricingRetryConsent(retry_single_items)
+            approved = consent.approve()
+            if approved:
+                print(f"  retrying {len(missing)} unpriced item(s) in {scope}, "
+                      "batch size 1...",
+                      file=sys.stderr)
+                for iid in missing:
+                    fetch_batch([iid], attempts)
+                    time.sleep(0.2)
+            elif approved is None:
+                note(f"{scope}: smaller-batch pricing retry not performed. "
+                     "Ask the user whether to retry with batch size 1; after approval, "
+                     "use --pricing-only-from with --retry-pricing-single-items.")
+            else:
+                note(f"{scope}: smaller-batch pricing retry not approved; "
+                     "available results retained.")
+
+    failed = [i for i in ids if i not in out and i not in absent]
+    if coverage is not None:
+        coverage.update(requested_item_ids=ids, returned_item_ids=sorted(out),
+                        unavailable_item_ids=sorted(absent), failed_item_ids=failed,
+                        complete=not failed and not absent)
+    if failed or absent:
+        note(f"{scope}: {len(failed)}/{len(ids)} item(s) remain unpriced; "
+             f"{len(absent)} unavailable. Missing prices do not establish "
+             "market prohibition or zero value.")
     return out
 
 
@@ -2171,6 +2199,23 @@ def recover_pricing(args):
                    world_absent=sorted(absent[0]), dc_absent=sorted(absent[1]), notes=notes)
     data["pricing_recovery_at_utc"] = datetime.now(timezone.utc).isoformat()
     calibration = calibrate_against_sales(data["retainers"], world_px, by_name)
+    coverage = {
+        "eligible_item_ids": ids,
+        "unresolved_names": sorted({row["name"] for row in rows
+            if not row.get("item_id") and row.get("market_allowed") is not False}),
+        "market_prohibited_stacks": sum(row.get("market_allowed") is False for row in rows),
+        "vendor_valued_stacks": sum(bool(row.get("vendor_price")) for row in rows)}
+    for name, px, missing_404 in zip(("world", "data_center"), prices, absent):
+        failed = sorted(set(ids) - set(px) - missing_404)
+        coverage[name] = {"requested_item_ids": ids, "returned_item_ids": sorted(px),
+                          "unavailable_item_ids": sorted(missing_404),
+                          "failed_item_ids": failed, "complete": not failed and not missing_404}
+    coverage["complete"] = (not coverage["unresolved_names"] and
+                            all(coverage[name]["complete"] for name in ("world", "data_center")))
+    data["pricing_coverage"] = coverage
+    if args.mode == "full" and args.require_pricing and not coverage["complete"]:
+        sys.exit("Required pricing is incomplete. No recovered outputs were replaced; "
+                 "retry or explicitly accept gaps with --allow-partial-pricing.")
     refresh_inventory_report(data, calibration)
     write_report_outputs(data, args)
 
@@ -2283,9 +2328,18 @@ def main():
     ap.add_argument("--pricing-batch-size", type=int, metavar="N",
                     help="items per request in both pricing scopes (default: World 50, DC 4)")
     ap.add_argument("--retry-pricing-single-items", action=argparse.BooleanOptionalAction,
-                    default=None, help="allow/decline singleton recovery for both scopes; unset asks")
+                    default=None, help="allow/decline bounded singleton retries; unset keeps automatic retries")
     ap.add_argument("--pricing-only-from", metavar="FILE",
                     help="recover missing prices from a saved snapshot without scraping Lodestone")
+    pricing = ap.add_mutually_exclusive_group()
+    pricing.add_argument("--require-pricing", dest="require_pricing", action="store_true",
+                         default=None, help="require complete responses in both pricing scopes (default)")
+    pricing.add_argument("--allow-partial-pricing", dest="require_pricing", action="store_false",
+                         help="accept pricing gaps for this run; failed items remain unknown")
+    ap.add_argument("--price-world-chunk", type=int, default=50,
+                    help="items per home-World pricing request (default: 50)")
+    ap.add_argument("--price-dc-chunk", type=int, default=4,
+                    help="items per data-center pricing request (default: 4)")
     ap.add_argument("--min-gil", type=int, default=1000)
     ap.add_argument("--refresh-items", action="store_true")
     ap.add_argument("--quest-pages", type=int, default=1)
@@ -2319,13 +2373,25 @@ def main():
             ap.error("pricing-only recovery uses batch size 1 and cannot skip pricing/retainers")
     else:
         args.out = args.out or "status.json"
+    if args.pricing_batch_size is not None:
+        args.price_world_chunk = args.price_dc_chunk = args.pricing_batch_size
+    if args.price_world_chunk < 1 or args.price_dc_chunk < 1:
+        ap.error("pricing chunk sizes must be positive")
 
     try:
+        explicit_identity = any((args.id, args.world, args.dc))
         args.mode = resolve_mode(args.mode, args.config,
-                                 explicit_identity=any((args.id, args.world, args.dc)))
+                                 explicit_identity=explicit_identity)
         args.id, args.world, args.dc = resolve_identity(args.id, args.world, args.dc, args.config)
+        sync_preferences = (load_config(args.config).get("preferences", {}).get("sync", {})
+                            if not explicit_identity else {})
+        if args.require_pricing is None:
+            args.require_pricing = sync_preferences.get(
+                "require_complete_pricing", not (args.no_pricing or args.no_retainers))
     except ValueError as exc:
         ap.error(str(exc))
+    if args.mode == "full" and args.require_pricing and (args.no_pricing or args.no_retainers):
+        ap.error("complete pricing conflicts with --no-pricing or --no-retainers")
 
     if args.pricing_only_from:
         try:
@@ -2545,20 +2611,22 @@ def main():
                     notes.append("Universalis marketable list unavailable; "
                                  "trying resolved IDs without a known market prohibition. Missing prices do "
                                  "not establish that an item is untradeable.")
-                # Tooltip market flags and vendor sale values are already
-                # available. Vendor-only items need no remote market pricing;
-                # vendor-unsellable items may still be marketable. Preserve
-                # unknown eligibility rather than interpreting it as blocked.
-                pricing_ids = sorted({r["item_id"] for r in rows
-                                      if r["item_id"]
-                                      and r.get("market_allowed") is not False
-                                      and (marketable is None or r["item_id"] in marketable)})
-                consent = PricingRetryConsent(args.retry_pricing_single_items)
+                pricing_ids = pricing_item_ids(rows, marketable)
+                consent = (PricingRetryConsent(args.retry_pricing_single_items)
+                           if args.retry_pricing_single_items is not None else None)
                 world_absent, dc_absent = set(), set()
-                world_px = fetch_prices(
-                    pricing_ids, args.world, session,
-                    chunk=args.pricing_batch_size or 50,
-                    retry_consent=consent, notes=pricing_notes, absent_ids=world_absent)
+                data["pricing_coverage"] = {
+                    "eligible_item_ids": pricing_ids,
+                    "unresolved_names": sorted({r["name"] for r in rows
+                        if not r.get("item_id") and r.get("market_allowed") is not False}),
+                    "market_prohibited_stacks": sum(r.get("market_allowed") is False for r in rows),
+                    "vendor_valued_stacks": sum(bool(r.get("vendor_price")) for r in rows),
+                    "world": {}, "data_center": {}}
+                world_px = fetch_prices(pricing_ids, args.world, session,
+                                        chunk=args.price_world_chunk,
+                                        coverage=data["pricing_coverage"]["world"],
+                                        retry_consent=consent, notes=pricing_notes,
+                                        absent_ids=world_absent)
                 # DC scope aggregates every world in the DC and is much
                 # more prone to 504s under load than a single-world query
                 # at the same size (confirmed live, 2026-08-28) - smaller
@@ -2570,11 +2638,16 @@ def main():
                 # 1.6s at 50 vs 2.1s at 20 on 2026-09-09) - the timeout is
                 # driven by per-item aggregation, not response size. More
                 # history means better medians, so take it.
-                dc_px = fetch_prices(
-                    pricing_ids, args.dc, session, chunk=args.pricing_batch_size or 4,
-                    listings=50, entries=50, attempts=3,
-                    retry_consent=consent, notes=pricing_notes,
-                    absent_ids=dc_absent)
+                dc_px = fetch_prices(pricing_ids, args.dc, session,
+                                     chunk=args.price_dc_chunk,
+                                     listings=50, entries=50, attempts=3,
+                                     coverage=data["pricing_coverage"]["data_center"],
+                                     retry_consent=consent, notes=pricing_notes,
+                                     absent_ids=dc_absent)
+                data["pricing_coverage"]["complete"] = (
+                    not data["pricing_coverage"]["unresolved_names"] and
+                    all(data["pricing_coverage"][scope]["complete"]
+                        for scope in ("world", "data_center")))
                 pricing_notes.extend(pricing_coverage_notes(pricing_ids, world_px, dc_px, args.dc))
                 vendor_buy = {}
                 # Missing market data does not erase known vendor value.
@@ -2632,6 +2705,16 @@ def main():
         data["all_rows"] = rows
         if "pricing_context" in data:
             data["pricing_context"]["protected_materials"] = sorted(protected)
+        if (not rows and not args.no_pricing and data["retainers"]
+                and all("baggage/" in ret.get("pages_ok", [])
+                        and not ret.get("pages_missing") for ret in data["retainers"])):
+            # Confirmed empty storage needs no market requests. An unavailable inventory
+            # page is not evidence of emptiness and must not satisfy the pricing gate.
+            data["pricing_coverage"] = {
+                "eligible_item_ids": [], "unresolved_names": [],
+                "market_prohibited_stacks": 0, "vendor_valued_stacks": 0,
+                "world": {"complete": True}, "data_center": {"complete": True},
+                "complete": True}
 
         sale_rows_dropped = sum(ret.get("sale_rows_dropped") or 0
                                 for ret in data["retainers"])
@@ -2661,6 +2744,12 @@ def main():
     if not qout.get("recent") and not q_note:
         notes.append("quest page parsed but empty - rerun with --dump")
     data["notes"] = notes
+
+    if args.mode == "full" and args.require_pricing:
+        if not data.get("pricing_coverage", {}).get("complete"):
+            sys.exit("Required pricing is incomplete. No snapshot/report/protection files "
+                     "were replaced. Retry, reduce --price-world-chunk and --price-dc-chunk "
+                     "down to 1, or explicitly accept remaining gaps with --allow-partial-pricing.")
 
     if quest_protection is not None:
         from crafting_protection import write_json

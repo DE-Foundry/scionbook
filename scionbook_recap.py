@@ -1,4 +1,4 @@
-"""Validate untrusted recap proposals and install only local player-state changes."""
+"""Validate untrusted player-state proposals and install only permitted local changes."""
 from contextlib import contextmanager
 import json
 import os
@@ -13,7 +13,7 @@ from scionbook_config import parse_json, validate_config
 OUTPUTS = ("SCIONBOOK_MEMORY.md", "SCIONBOOK_DAILY_WEEKLY_CHECKLIST.md", "scionbook.json")
 INPUTS = (*OUTPUTS, "status.json", "quest_history.md", "SCIONBOOK_INSTRUCTIONS.md",
           "AGENTS.md", "standards.md", ".agents/skills/apply-recap/SKILL.md",
-          "docs/gameplay-preferences.md")
+          ".agents/skills/save-state/SKILL.md", "docs/gameplay-preferences.md")
 SKILL = ".agents/skills/apply-recap/SKILL.md"
 MAX_FILE = 2_000_000
 
@@ -47,7 +47,7 @@ SCHEMA = {
     "required": ["status", "changes"]}
 
 
-def read_file(root, name):
+def read_file(root, name, max_bytes=MAX_FILE):
     """Read bounded regular files only; reject links, including parent-directory links."""
     path = root / name
     for parent in path.relative_to(root).parents:
@@ -63,8 +63,8 @@ def read_file(root, name):
         opened = os.fstat(stream.fileno())
         if (opened.st_dev, opened.st_ino) != (info.st_dev, info.st_ino):
             raise ValueError("Recap input changed while opening it.")
-        data = stream.read(MAX_FILE + 1)
-    if len(data) > MAX_FILE:
+        data = stream.read(max_bytes + 1)
+    if len(data) > max_bytes:
         raise ValueError("Recap input exceeds the size limit.")
     data.decode("utf-8")
     return data
@@ -125,6 +125,11 @@ def validate(proposal, original):
             if ({k: v for k, v in before.items() if k != "preferences"}
                     != {k: v for k, v in after.items() if k != "preferences"}):
                 raise ValueError("Recaps may change preferences only, never character configuration.")
+        # Text reads normalize Windows CRLF. Preserve original bytes when the
+        # proposal differs only in newline encoding, so replay remains a no-op.
+        if (original[name] is not None
+                and data.replace(b"\r\n", b"\n") == original[name].replace(b"\r\n", b"\n")):
+            data = original[name]
         changes[name] = data
     return changes
 
@@ -168,7 +173,7 @@ def install(root, original, proposal):
         raise
     else:
         cleanup = True
-        return {"status": "applied", "summary": f"Saved and verified {len(changes)} recap file(s)."}
+        return {"status": "applied", "summary": f"Saved and verified {len(changes)} local player file(s)."}
     finally:
         # Remove only verified successful saves or verified complete rollbacks.
         if cleanup:

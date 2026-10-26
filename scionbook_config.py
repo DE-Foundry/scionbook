@@ -34,6 +34,11 @@ def validate_preferences(preferences):
     """Validate optional gameplay fields without restricting legacy preferences."""
     if not isinstance(preferences, dict):
         raise ValueError("preferences must be an object.")
+    sync = preferences.get("sync", {})
+    if not isinstance(sync, dict):
+        raise ValueError("preferences.sync must be an object.")
+    if "require_complete_pricing" in sync and type(sync["require_complete_pricing"]) is not bool:
+        raise ValueError("preferences.sync.require_complete_pricing must be a boolean.")
     gameplay = preferences.get("gameplay", {})
     if not isinstance(gameplay, dict):
         raise ValueError("preferences.gameplay must be an object.")

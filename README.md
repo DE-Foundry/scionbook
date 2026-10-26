@@ -67,7 +67,7 @@ Use the virtual environment's Python for every helper below. If activation is un
 use `python` in place of `python3`. Optional client launchers have their own requirements; the portable workflow needs none of them.
 The optional CLI launchers require Bash and the selected Codex or Claude Code CLI.
 
-Open a fresh **Repository Maintainer** chat with repository read/write access and send:
+Open this folder in your assistant with local read/write access and send:
 
 ```text
 Read AGENTS.md and follow .agents/skills/setup/SKILL.md for Character Name on Home World.
@@ -95,57 +95,48 @@ On a setup rerun, retain the existing timezone, mode, preferences and reports un
 To change characters, use a separate checkout and setup there. To change full/public mode for the same
 character, rerun setup with the requested mode; retained private history remains historical in public mode.
 
-## Two independent chats
+## One ongoing conversation
 
-Use the same assistant or different providers for each role; shared local files carry durable state.
+After setup and its first validated sync, keep using that conversation. Discuss options, plan play,
+report progress, change preferences, and request later refreshes there. Clear standing preferences and
+confirmed outcomes save immediately to ignored local files; tentative ideas and temporary choices stay
+separate. No recap, handoff, or fresh chat is needed to make a preference reusable.
 
-- **Session Planner:** open a fresh chat with read-only file access and send
-  `Read AGENTS.md and follow .agents/skills/start-session/SKILL.md.` New gameplay reports stay in
-  that conversation. Follow recap-session when finished to produce a recap for review.
-- **Repository Maintainer:** use a separate chat with repository read/write access. Follow
-  `.agents/skills/apply-recap/SKILL.md` with the supplied recap to save reports. Follow
-  `.agents/skills/sync/SKILL.md` only when explicitly requesting a refresh; setup includes its first refresh.
+Current preferences live in scionbook.json, dated progress in local memory/checklist, and scraped facts
+in the validated snapshot/history. A preference save does not refresh Lodestone. A sync refreshes data,
+reconciles local records and current advice, and reloads files in the same conversation. Newer player
+reports are preserved when fetched game data lags. Shared application behavior changes only through
+an explicit maintenance request, never by copying personal discussion into a skill.
 
-Neither role reads the other's transcript or uses cross-chat memory. Copy only the approved recap into
-apply-recap, then use a fresh startup prompt for the next role. A prompt is not a save or a launched chat.
-See [manual handoffs](docs/chat-handoffs.md) and [assistant setup](docs/assistant-setup.md), including
-what to do when the assistant only supports uploaded files. Optional [Codex launchers and draft links](docs/integrations/codex.md)
-are separate conveniences. They are not required by the Python tools or shared workflows.
-
-Optional CLI examples (run in a user-accessible terminal):
-
-```bash
-SCIONBOOK_CLIENT=claude bash scripts/scionbook-chat session
-python3 scionbook_handoff.py session --client claude --confirmed
-```
-
-Use `--confirmed` only after explicit approval of that transition. See [Claude Code](CLAUDE.md)
-and [handoffs](docs/chat-handoffs.md) for permission and save-verification boundaries.
+See [assistant setup](docs/assistant-setup.md) for capabilities. A read-only/upload-only assistant can
+plan and prepare edits, but must identify them as unsaved. A new chat is optional for a fresh context;
+it reads local state rather than another chat's transcript. Existing optional launchers are documented
+in [continuation guidance](docs/chat-handoffs.md) and [Codex integration](docs/integrations/codex.md).
 
 ## Everyday workflow
 
-See the [skill guide](docs/skills.md) for all 11 skills, copyable example prompts, required inputs,
-which chat to use, and what gets saved. `$name` below is optional shorthand: in any assistant,
-send `Read .agents/skills/<name>/SKILL.md and follow it` with your request.
+See the [skill guide](docs/skills.md) for all 12 skills. `$name` is optional shorthand: any assistant can
+read `.agents/skills/<name>/SKILL.md` and follow it with your request.
 
-| Step | Where | Action and result |
-|---|---|---|
-| First use | Maintainer, file read/write | `$setup Character Name on Home World` initializes local files and validates the first snapshot. |
-| Begin or continue play | Session, read-only | `$start-session` reads saved sources; `$tasks` tracks new progress in this conversation. |
-| Review inventory or markets | Either role, analysis only | `$inventory-cleanup` or `$market-update` reads saved holdings and protection; public prices may be checked separately. |
-| End play | Session | `$recap-session` produces the complete recap and offers the available handoff. Nothing is saved by generating a recap. |
-| Save reports | Maintainer | `$apply-recap` with the recap saves reports/preferences/checklist outcomes. Paste the recap into the destination chat before submitting. |
-| Refresh character data | Maintainer | Request `$sync` after Lodestone updates. It validates and reconciles the snapshot, history, report, and configured crafting protection. |
-| Return to play | Fresh Session chat | Open a fresh read-only chat and submit the Session startup prompt. |
+| Step | Action and result |
+|---|---|
+| First use | `$setup Character Name on Home World` initializes local files and validates the first snapshot. Continue here. |
+| Begin or resume play | `$start-session` loads saved sources and plans from current evidence. |
+| Discuss preferences | Explore alternatives freely; a clear standing choice saves immediately through `$save-state`. |
+| Report progress | `$tasks` saves confirmed outcomes locally, then recommends what to do next. |
+| Review inventory or markets | Specialist skills analyze saved holdings and current public references. |
+| Refresh character data | Explicitly request `$sync`; it validates/reconciles sources and continues in this conversation. |
+| Summarize or finish | `$recap-session` summarizes saved progress; an explicit save request also saves outstanding reports. |
+| Import a recap | `$apply-recap` saves a supplied report here; it does not retrieve another chat. |
+| Change the application | `$start-maintenance` handles explicit code/skill/documentation work. |
 
-In a chat already assigned a role, invoking the other role's skill does not reset context. Open a fresh
-chat using the handoff instead. Reusing an existing Session chat is also possible: ask it to reload updated
-files, preserving its newer conversation reports. This is a reload, not a clean-context transition.
+Full pricing is the default for authenticated refreshes. If pricing requests keep failing, choose retry,
+smaller batches down to one item, or ignore the remaining failures for that run with gaps shown. Skipped
+or failed prices never become zero value. Reduced pricing does not waive other sync validation.
 
-For a first crafting keep list, ask Maintainer to **set up crafting-material protection from my saved levels
-and quest history**. It researches the missing references once and saves the version 2 plan. Request sync
-explicitly to produce the matching cleanup report; see [crafting protection](docs/crafting-protection.md).
-A request to apply a recap and sync together authorizes both; a recap merely mentioning a needed sync does not.
+For a first crafting keep list, ask to **set up crafting-material protection from my saved levels and
+quest history**. Research is saved locally and reused; see [crafting protection](docs/crafting-protection.md).
+Request sync explicitly for a matching refreshed cleanup report. Applying a recap alone never authorizes it.
 
 ## Specialist skills
 
@@ -156,8 +147,8 @@ A request to apply a recap and sync together authorizes both; a recap merely men
 | `$gear-planner` | Intended-job upgrades, item-level gates, currency costs and acquisition paths |
 | `$hunt-planner` | Hunts ordered to reduce travel, with levels, locations, entry points and job suitability |
 
-These skills analyze and recommend; they do not execute in-game actions. Private character refresh belongs
-to Maintainer sync. Public market/game-reference lookups can support either role. Personal policies such as
+These skills analyze and recommend; they do not execute in-game actions. Private character refresh uses
+an explicitly requested sync in the same conversation. Public market/game-reference lookups can support either role. Personal policies such as
 liquidation, retainer ordering, platform/controller, spoiler tolerance, and goals live in local preferences.
 
 ## Local state and privacy
@@ -224,8 +215,8 @@ or cleaned checkout.
 | `quest_turnins.json` | Copy if crafting protection is configured: researched quests and explicit keeps. |
 | `quest_mats.json` | Copy with the crafting plan: protected materials, reasons, and cached recipes. |
 
-1. Finish any active save or sync in the original directory. If progress exists only in a Session chat,
-   use `$recap-session` and apply that recap in Maintainer before copying; applying it does not require sync.
+1. Finish any active save or sync in the original directory. Save any outstanding explicit reports with `$save-state` before copying;
+   no sync or chat handoff is required for that save.
 2. Copy the files above into the **root of the new project**, alongside its Python files. Keep them together
    from the same checkout so the snapshot, history, cleanup report, and crafting protection match. Use a
    fresh destination without another character's state; do not overwrite newer reports with an older copy.
@@ -233,7 +224,7 @@ or cleaned checkout.
    including `.agents/`, `.claude/`, `.codex/`, `CLAUDE.md`, `.gitignore`, `SCIONBOOK_INSTRUCTIONS.md`, and `standards.md`.
    Do not copy `.venv`, `.git`, credentials, raw dumps, or temporary handoff/staging files. Custom saved
    outputs under `local/` are optional; carry over only those you want to retain.
-4. Open the new directory in a fresh read-only chat and send `$start-session`. It loads the copied state;
+4. Open the new directory in a conversation with local read/write access and send `$start-session`. It loads the copied state;
    **neither `$setup` nor `$sync` is needed merely because the directory changed**. A Lodestone session
    cookie is not needed to read saved files; authenticate again only when a later full sync is requested.
 
@@ -256,13 +247,13 @@ export LODESTONE_COOKIE
 In zsh, use `read -r -s 'LODESTONE_COOKIE?Lodestone cookie: '` then export it. An environment variable is
 available to commands started from that shell; setting it there does not update an already-running desktop
 app. Start a local-capable assistant from that shell if it supports environment inheritance. For the optional
-Codex CLI adapter, `bash scripts/scionbook-chat maintainer` does this. The Session Planner does not need the cookie; run it from a shell without that variable.
+Codex CLI adapter, `bash scripts/scionbook-chat maintainer` does this. Planning and local saves do not need a cookie; supply it only through the documented local authentication route for a full sync.
 Do not paste a cookie into an app chat to work around missing environment inheritance.
 
 Alternatively, run the scraper yourself in a visible terminal without `--cookie-env`; its hidden prompt
 works without storing a cookie in shell history. Blank input or an empty credential option aborts a full
 refresh before any network request or output write. Public mode must be configured or explicitly selected;
-there is no automatic downgrade. Have Maintainer validate staged outputs before installing them.
+there is no automatic downgrade. Have the assistant validate staged outputs before installing them.
 The helper may expose `--cookie`, but do not use it: command arguments/history can retain the credential.
 A missing or expired cookie must be replaced for full mode. A pricing/network/markup failure alone does
 not establish that the cookie expired.
@@ -275,7 +266,7 @@ procedure. Direct helpers do not reconcile prose reports, install a complete val
 For an independent full-mode development fetch, create `.scionbook-tmp/` first and run:
 
 ```bash
-python3 scionbook_report.py --cookie-env --no-retry-pricing-single-items --quest-pages 100 --recent-quests 0 --out .scionbook-tmp/status.json --report .scionbook-tmp/cleanup.md --quest-mats-out .scionbook-tmp/quest_mats.json
+python3 scionbook_report.py --cookie-env --quest-pages 100 --recent-quests 0 --out .scionbook-tmp/status.json --report .scionbook-tmp/cleanup.md --quest-mats-out .scionbook-tmp/quest_mats.json
 python3 scionbook_quest_history.py --from-status --status .scionbook-tmp/status.json --out .scionbook-tmp/quest_history.md
 ```
 
@@ -293,36 +284,7 @@ written only when a version 2 plan successfully reconciles; never install a left
 total. The history renderer refuses incomplete data and preserves its previous output. Additional flags:
 `--fast` skips achievements/collections, `--no-pricing` keeps unpriced inventory unknown, `--refresh-items`
 refreshes the shared item-name cache, and `--dump raw --probe` captures diagnostic HTML locally.
-Pricing uses batches of 50 items for the home World and 4 for the DC. `--pricing-batch-size N`
-overrides both (minimum 1). After failed or partial batches, an interactive run asks before retrying
-missing items in batches of 1, sharing one answer across the home World and DC. Use
-`--no-retry-pricing-single-items` to decline retries and disable terminal prompts, including in agent
-shells with a terminal attached. When unset without a terminal, notes identify pending consent for the
-Maintainer to ask in chat. After approval, `--retry-pricing-single-items` authorizes one recovery pass;
-each request retains its bounded retries. No or silence preserves available prices and vendor values,
-with gaps disclosed. Starting with batch size 1 does not trigger a smaller retry. Singleton failures
-produce a summary rather than a warning for every failed item.
 The report is always rewritten when `--report` is supplied, including when no inventory report exists.
-
-An approved retry can reuse the staged snapshot without scraping the character again:
-
-```bash
-python3 scionbook_report.py --pricing-only-from .scionbook-tmp/status.json --retry-pricing-single-items --out .scionbook-tmp/status-priced.json --report .scionbook-tmp/cleanup-priced.md
-```
-
-Pricing-only recovery requests missing IDs in each scope, keeps successful prices, and rebuilds verdicts,
-totals, sales calibration, and the cleanup report from saved inputs and material protections. It requires
-an explicit approval flag and a separate output snapshot. It does not need a cookie or fetch Lodestone,
-reload the item index, or write quest history/crafting files. Character `fetched_at_utc` stays unchanged;
-`pricing_recovery_at_utc` records the recovery attempt. Validate the recovered snapshot/report together
-with the original staged history/protection before installation. Retained prices keep only the parsed
-numeric inputs used for valuation: fallback prices, velocities, listing counts, and HQ/unit-price
-samples. Third-party names/IDs and unused response metadata are not saved. Recovery also trims older
-raw contexts in its output, leaving the source file untouched. Inventory recovery rows contain only
-the fields needed for verdicts, protections, and report grouping.
-Older snapshots without the optional `pricing_context` remain readable, but cannot support
-this mode; obtain recovery context at the next separately requested full sync. Running the full scraper
-with only `--retry-pricing-single-items` still rescrapes the entire character.
 
 The snapshot includes jobs, equipped-job gear attribution, quests, currencies/reputation, collections,
 retainer inventory/listings/sales/ventures, pricing verdicts, and run-specific availability notes. Missing
@@ -333,16 +295,59 @@ Inventory and current listings are disjoint; recent sales are already gone. Mark
 retainer. Realistic proceeds are constrained by sale depth, not simply price multiplied by all stock.
 Treat unresolved items and missing pricing evidence as unknown in cleanup advice; lack of a market price
 is not proof that an item is worthless. Known market-prohibited items may still have vendor value. The
-scraper checks tooltip market eligibility and vendor sale values before pricing, then filters market
-requests by Universalis marketability. Market-prohibited items skip market pricing, including when the
-catalog is unavailable; known vendor values remain usable. Vendor-unsellable items can still be marketable.
-Unknown eligibility is disclosed and does not establish a prohibition. Selling proceeds and liquidity
-estimates use the configured home World only. When its price is missing, a usable DC price is labeled
-**Non-home-World price**, with its source and unit price. You can
+scraper checks each stack's market prohibition and known vendor sale value before pricing, filters
+market requests by Universalis marketability, and warns if that catalog is unavailable. Failed batches
+shrink down to individual requests; successful smaller sizes are reused for the remaining items.
+Selling proceeds and liquidity estimates use the configured home World only. When its price
+is missing, a usable DC price is labeled **Non-home-World price**, with its source and unit price. You can
 use it as a provisional starting listing price on your home World; local proceeds and sale speed remain
 unestimated. If neither scope has a usable price, the item remains unknown. Other Worlds/DCs are never
 selling destinations. Existing saved reports retain their old output until the next explicitly requested sync.
 Material protection must match confirmed or inferred unfinished quests and explicit crafting keeps.
+
+Authenticated syncs include all discovered retainers by default: levels, holdings, listings, recent sales,
+and ventures. Use `--no-retainers` only for an explicit player choice; public mode cannot retrieve these
+private pages. Retainer equipment/item levels may require an in-game report and are not established by
+a successful inventory sync. Gameplay planning defaults to level-appropriate ventures, checking actual
+equipment and venture requirements before suggesting upgrades; players can choose another goal.
+
+Sync timing and pricing requirements are personal settings in ignored `scionbook.json`, separate from
+gameplay priorities. Optional `preferences.sync.require_complete_pricing` is a boolean and defaults to true. When true, or
+when `--require-pricing` is passed, an authenticated run must receive valid item responses for every
+eligible resolved item in both the home-World and data-center scopes before writing outputs. Unresolved
+eligible names, failed requests, and unavailable item responses fail this gate; market-prohibited items
+need no market lookup. Valid responses with no sales/listings establish no published price, not zero value.
+`pricing_coverage` records requested, returned, unavailable, and failed item IDs per scope. This setting
+conflicts with `--no-pricing` and `--no-retainers` unless `--allow-partial-pricing` explicitly overrides it
+for this run; it does not impose a runtime deadline. `--require-pricing` forces full coverage over a saved
+false preference. With no saved requirement, explicit `--no-pricing`/`--no-retainers` also select reduced
+coverage. Public mode does not require private pricing. If failures persist
+after individual retries, preserve the prior files and report the incomplete run. Let the user choose retry, smaller batches down to one, or `--allow-partial-pricing` to accept the
+remaining gaps. The override still requests prices and keeps available responses; failed prices remain
+unknown. It never changes the saved default. Do not reduce coverage solely to shorten execution. `--price-world-chunk` and `--price-dc-chunk` set initial batch sizes.
+
+### Recover missing prices without refreshing the character
+
+Snapshots produced after explicitly accepting partial pricing include a versioned pricing recovery
+context. After approval, run:
+
+```bash
+python3 scionbook_report.py --pricing-only-from .scionbook-tmp/status.json --retry-pricing-single-items --out .scionbook-tmp/status-priced.json --report .scionbook-tmp/cleanup-priced.md
+```
+
+Recovery requests only missing prices in a bounded singleton pass. It needs no cookie, retains successful
+prices, known vendor values and saved protections, and preserves fetched_at_utc. The separate
+pricing_recovery_at_utc records the attempt. Recovered pricing_coverage is recomputed for both scopes;
+incomplete required coverage leaves prior outputs untouched. Use --allow-partial-pricing only when
+explicitly accepting remaining gaps. Failed full-pricing refreshes do not produce a new recovery source.
+Never reuse a stale staged file as though it came from the failed run. Retain the original snapshot/report
+and matching history/protection files until the recovered pair is validated, then install them together.
+Older snapshots remain readable but need a separately authorized refresh to gain recovery context.
+
+Stored prices contain only numeric valuation inputs and HQ/unit-price samples, excluding third-party
+names/IDs and unused metadata; recovery also trims legacy raw contexts without modifying the source.
+--pricing-batch-size sets both scope sizes; the existing per-scope flags remain available.
+--no-retry-pricing-single-items explicitly disables automatic fallback without relaxing coverage.
 
 ## Optional quest-material protection
 
@@ -372,11 +377,11 @@ completed quests; migrate them using verified quest references, never invented I
 ## When a workflow cannot finish
 
 - **Character lookup is ambiguous or blocked:** supply the official Lodestone profile URL; do not choose a fuzzy match.
-- **Setup has configuration but no validated snapshot:** resume `$sync` in Maintainer after resolving credentials or fetch errors; do not reinitialize progress.
+- **Setup has configuration but no validated snapshot:** resume `$sync` here after resolving credentials or fetch errors; do not reinitialize progress.
 - **Quest history is incomplete:** increase the page limit and validate the known total. Preserve the last complete canonical files.
 - **Crafting references have gaps:** research only missing tiers/items, preserve explicit keeps, and disclose uncovered special quests. Missing coverage is not permission to discard materials.
 - **A supported client draft opens without recap text:** paste the displayed recap after “Recap to apply:” before Send. The link intentionally carries no gameplay data.
-- **A save or sync fails:** report any partial work, preserve previous validated sources, and resolve the failure before a success handoff. Do not treat a prepared link as a completed save.
+- **A save or sync fails:** report any partial work, preserve previous validated sources, and resolve the failure before claiming success. A proposed edit is not a verified save.
 
 ## Development
 

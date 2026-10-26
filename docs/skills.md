@@ -6,33 +6,30 @@ Provide AGENTS.md and referenced files if your assistant cannot read the reposit
 with native skill discovery, not a terminal command. Replace bracketed placeholders with your details.
 Codex discovers `.agents/skills/`; Claude Code uses `.claude/skills` and `/skill-name`.
 
-For first use, complete the [installation steps](../README.md#get-started), then run `$setup` in a fresh
-Repository Maintainer chat. Setup includes the initial refresh. Later sessions use the saved files;
-starting a chat does not automatically refresh them.
+Complete setup once, then keep using the same conversation for discussion, planning, local saves,
+and explicitly requested syncs. Give the player agent local write access. A separate maintenance chat
+is optional for application work, never a prerequisite for saving preferences or progress.
 
-## Choose a skill and chat
+## Choose a skill
 
-Use **Maintainer** with repository read/write access for setup, saves, refreshes, and repository work. Use **Session**
-with read-only for gameplay planning and progress tracking. The four specialist skills work in either
-role without changing its permissions. In an established chat, keep its role; use a fresh chat for the
-other role. A fresh chat can open in the same app window.
+| Skill | Use it for | Local file effect |
+|---|---|---|
+| [setup](#setup) | Find your character and initialize Scionbook | Configuration, missing templates, first validated sync |
+| [start-session](#start-session) | Begin/resume planning | Loads state; clear new reports/preferences save through save-state |
+| [tasks](#tasks) | Report confirmed progress or ask what remains | Saves dated outcomes and clear preferences |
+| [save-state](#save-state) | Apply a clear personal change immediately | Validated local preferences, memory, checklist; no scrape |
+| [recap-session](#recap-session) | Summarize or finish play | Summary; explicit save/end request also saves outstanding reports |
+| [apply-recap](#apply-recap) | Import a supplied report | Local reports/preferences; no transcript retrieval |
+| [sync](#sync) | Explicitly refresh character data | Validated snapshot/history/report, reconciliation, same-chat reload |
+| [start-maintenance](#start-maintenance) | Explicit application changes | Only requested source changes |
+| [inventory-cleanup](#inventory-cleanup) | Storage/protection/disposal advice | Requested protection research may save locally |
+| [market-update](#market-update) | Listings, prices, selling slots | Recommendations |
+| [gear-planner](#gear-planner) | Upgrades for an intended job | Recommendations |
+| [hunt-planner](#hunt-planner) | Route supplied hunt targets | Recommendations |
 
-| Skill | Chat | Use it for | Local file effect |
-|---|---|---|---|
-| [setup](#setup) | Maintainer | Find your character and initialize Scionbook | Saves configuration, creates missing memory/checklist files, performs initial sync |
-| [start-maintenance](#start-maintenance) | Fresh Maintainer | Begin repository or data work | None from startup alone |
-| [start-session](#start-session) | Fresh or existing Session | Load saved state and plan play | None |
-| [tasks](#tasks) | Session | Report progress or ask what remains | Conversation only |
-| [recap-session](#recap-session) | Session | Summarize what is worth saving | Outputs recap; offers a separate apply handoff |
-| [apply-recap](#apply-recap) | Maintainer | Save a supplied recap | Updates local memory, checklist outcomes, and relevant preferences |
-| [sync](#sync) | Maintainer | Refresh Lodestone and reconcile saved state | Updates validated snapshot, applicable history, reports, and configured protection |
-| [inventory-cleanup](#inventory-cleanup) | Either | Consolidate and decide what to keep or dispose of | Recommendations; Maintainer can maintain crafting protection when requested |
-| [market-update](#market-update) | Either | Review listings, prices, and available selling slots | None |
-| [gear-planner](#gear-planner) | Either | Plan upgrades for a particular job and goal | None |
-| [hunt-planner](#hunt-planner) | Either | Put supplied hunt targets into practical hunting order | None |
-
-No skill executes in-game actions or automatically commits/pushes. Player files stay local and ignored by
-Git. Advice, proposed purchases, and generated recaps do not establish completed or saved progress.
+No skill executes in-game actions or automatically commits/pushes. Personal data stays ignored, never
+shared source. Discussion, suggestions, and pending activities do not establish decisions/completions.
+Read-only/upload-only clients prepare unsaved proposals and disclose that limit.
 
 ## Setup
 
@@ -62,111 +59,94 @@ different character.
 
 [Skill instructions](../.agents/skills/start-maintenance/SKILL.md)
 
-Open a fresh chat with repository read/write access, then send:
+Use for explicit code, skill, test, or shared documentation work:
 
 ```text
 $start-maintenance
 ```
 
-You can include a task, such as reviewing documentation or explaining a saved-data warning. This selects
-the Maintainer role and reads sources relevant to the request. Startup alone does not refresh data, save
-new gameplay reports, begin a gameplay plan, or authorize a commit/push.
+A separate development conversation is optional. Startup alone does not authorize source changes,
+gameplay planning, sync, commits, or pushes. Personal preferences never change shared skills.
 
 ## Start session
 
 [Skill instructions](../.agents/skills/start-session/SKILL.md)
 
-After setup succeeds, open a fresh read-only chat:
+After setup, continue here or resume later with:
 
 ```text
 $start-session I have 45 minutes and want to work on crafting.
 ```
 
-The skill loads configuration and saved sources, checks snapshot age and reset availability, and suggests
-one primary objective with useful next steps. It honors saved preferences and newer reports you supply.
-It directs missing setup or needed refreshes to Maintainer; it does not scrape or save files.
-
-You can also use it to resume an existing Session chat. After a Maintainer sync, ask that Session to reload
-the saved files while preserving newer conversation reports. This reload does not clear its context.
+It loads saved state, checks actual snapshot age/reset availability, and suggests useful next actions.
+Temporary choices affect the current plan without rewriting standing preferences. Missing setup or an
+explicit sync request is handled in this conversation when supported. No fresh chat is required.
 
 ## Tasks
 
 [Skill instructions](../.agents/skills/tasks/SKILL.md)
 
-Use during a Session to report only what you actually completed or ask for next actions:
-
 ```text
 $tasks I completed [quest name] and reached level [level] on [job]. What next?
 ```
 
+Confirmed reports save locally through save-state, with dates and known reset-cycle context. Questions
+about remaining tasks do not establish completion. Pending activities stay pending. Saves never fabricate
+a snapshot refresh. The assistant verifies persistence before saying saved and continues the discussion.
+
+## Save state
+
+[Skill instructions](../.agents/skills/save-state/SKILL.md)
+
 ```text
-$tasks What is still available for this session?
+Make [objective] my main priority from now on.
 ```
 
-The skill tracks dated reports in the conversation, distinguishes confirmed and pending outcomes, and
-recommends the next useful action. Nothing is saved to the repository. Use recap-session and apply-recap
-to preserve the reports for another chat.
+Clear standing preferences save immediately without a recap or repeated approval. “I might try [activity]”
+remains exploration; “just tonight” remains temporary. Configuration is the current baseline; memory
+retains dated outcomes or useful superseded history. The deterministic helper prepares originals,
+validates permitted changes, rejects concurrent edits, and re-reads saved bytes. It requires Python but
+no model or network. See the skill for its stdin proposal format and the pre-setup preference seed.
 
 ## Recap session
 
 [Skill instructions](../.agents/skills/recap-session/SKILL.md)
 
-Run this in the Session containing your gameplay reports:
-
 ```text
 $recap-session
 ```
 
-It outputs one self-contained recap of meaningful confirmed progress, preferences, corrections, pending
-outcomes, and the next starting point. It then checks the available transport before offering a handoff.
-Generating the recap alone saves nothing.
-
-In the optional Codex desktop draft route, say Yes to open an Apply Recap draft, select workspace-write, paste the
-shown recap after “Recap to apply:”, and press Send. After verifying the save, that chat provides a fresh
-Maintainer draft. With a supported full-launch route, confirmation forwards the approved recap to an
-isolated apply run and then starts a fresh Maintainer. Neither route automatically syncs.
-
-The default route is to copy the approved recap into a separate Maintainer using the portable apply-recap
-prompt. See [chat handoffs](chat-handoffs.md) for exact prompts and optional transport limits.
+Summarizes confirmed progress, changed preferences, pending outcomes, actual snapshot time, and the next
+starting point. Saved and unsaved are labeled separately. “Save/end this session” also saves outstanding
+clear reports. A recap-only request is a summary, not automatic permission to persist tentative ideas.
+No handoff or new conversation follows unless you explicitly request one.
 
 ## Apply recap
 
 [Skill instructions](../.agents/skills/apply-recap/SKILL.md)
 
-In Maintainer, supply the actual recap; the skill cannot retrieve another chat:
-
 ```text
 $apply-recap
-
-[Paste the complete recap here]
+[Paste the actual recap here.]
 ```
 
-It reconciles reports into local memory, dated checklist outcomes, and relevant personal preferences.
-Reapplying the same recap does not duplicate outcomes. It verifies the save and reports changes or gaps.
-Generated snapshot/history files and their scrape timestamps are not advanced by this prose save.
-
-Applying a recap does not refresh Lodestone. Request `$sync` separately when ready, or explicitly ask to
-apply the supplied recap **and sync**. A recap that merely mentions needing a sync is not that request.
-The requested post-save handoff provides a fresh Maintainer prompt after a verified save; supported client adapters can offer a draft.
+Imports a supplied recap in this conversation and verifies its local save. It never retrieves another
+chat, duplicates already represented reports, or runs sync unless explicitly asked to do both.
+A preference-only recap needs no fabricated completion records. Continue playing here afterward.
 
 ## Sync
 
 [Skill instructions](../.agents/skills/sync/SKILL.md)
 
-With the character configured and full-mode credentials available when required, send in Maintainer:
-
 ```text
 $sync
 ```
 
-Sync stages and validates a refresh, then reconciles the snapshot, applicable quest history, cleanup
-report, memory/checklist, and configured crafting protection. Newer player reports are preserved as dated
-reports. Public mode remains limited even after a successful refresh. Failed validation does not replace
-the prior validated snapshot. Lodestone can lag after logout; the result reports its actual source time.
-
-After success, sync provides the prompt for a fresh read-only Session. In the optional Codex desktop app route, accepting
-prepares a link: open it, select read-only, and press Send. A prepared draft has not started the skill.
-The new Session reads the saved files without inheriting the Maintainer transcript.
+Stages/validates character data and derived reports, reconciles local records, then reloads sources
+and updates current advice in this conversation. Preserves newer explicit reports when Lodestone lags.
+Failure preserves prior validated sources. Public-mode private data stays unknown.
+Full pricing is assumed; persistent failures offer retry, batches down to one, or explicit acceptance
+of remaining gaps for this run. That choice never silently changes the standing preference.
 
 ## Inventory cleanup
 
@@ -181,22 +161,21 @@ $inventory-cleanup Help me free retainer space. Start with consolidation and kee
 Expect a short assessment followed by practical batches grouped by retainer: item, HQ/NQ, quantity,
 recommended action, reason, and applicable value. It protects known needs and flags uncertain items.
 Retainer storage is not a complete audit of bags, armory, saddlebag, or dresser. Public-mode or stale
-holdings cannot support precise disposal advice; request Maintainer sync when needed. Market-board sale
+holdings cannot support precise disposal advice; explicitly request sync here when needed. Market-board sale
 recommendations cap each listing at 99 items (or a lower item limit), show how larger totals are split,
 and consider smaller stacks as a selling strategy. Each split uses a separate retainer listing slot.
 Selling recommendations apply only to your configured home World.
 
-For persistent crafting protection, ask Maintainer:
+For persistent crafting protection, ask:
 
 ```text
 Set up crafting-material protection from my saved job levels and complete quest history.
 ```
 
-Maintainer researches unfinished crafting quests and saves the plan and recipe-material closure in
+The agent researches unfinished crafting quests and saves the plan and recipe-material closure in
 `quest_turnins.json` and `quest_mats.json`. Full sync reconciles configured protection as quests are
 completed and level-limited keeps expire; job level alone does not prove a quest complete. Coverage gaps
-remain explicit. See [crafting protection](crafting-protection.md). In Session, desired protection changes
-remain recap requests rather than file edits.
+remain explicit. See [crafting protection](crafting-protection.md). Requested protection changes save locally using that workflow, without a handoff.
 
 ## Market update
 
@@ -216,7 +195,7 @@ your configured home World. When local pricing is missing, **Non-home-World pric
 you can use as a provisional starting listing price on your home World, with its source shown and local
 proceeds/sale speed left unestimated. Other Worlds/DCs are never selling destinations. Consolidation and
 protected materials affect recommendations. A public price lookup does not
-refresh private holdings. Stale or missing inventory needs Maintainer sync before precise transactions.
+refresh private holdings. Stale or missing inventory needs an explicitly requested sync before precise transactions.
 Nothing is listed, moved, sold, or saved by the skill.
 
 ## Gear planner
@@ -253,13 +232,12 @@ is supplied, it proposes one. Unknown flight or attunement is not assumed. Above
 unverified, and group-dependent targets are listed separately with reasons or conditions; elite spawn
 areas do not prove a mark is currently alive. The skill neither tracks kills nor saves progress.
 
-## Typical session from start to save
+## Typical ongoing session
 
-1. Complete `$setup` once in Maintainer, then open a read-only Session with `$start-session`.
-2. Use specialist skills as needed and `$tasks` for actual progress reports.
-3. Run `$recap-session`, review the recap, and accept the offered handoff if you want it saved.
-4. Complete `$apply-recap` in Maintainer; desktop drafts need the recap pasted before Send.
-5. Request `$sync` when Lodestone is ready to refresh, then accept the offered fresh Session if desired.
+1. Complete setup and its initial validated sync, then continue in that conversation.
+2. Discuss goals and options; clear standing choices save immediately and tentative ideas stay open.
+3. Use specialists and report actual progress with tasks; confirmed outcomes save locally.
+4. Request sync when needed; choose retry/smaller batches/ignore if pricing failures persist.
+5. Optionally request a recap or start a new conversation that reads the durable local files.
 
-For file ownership and portability, see [local state and privacy](../README.md#local-state-and-privacy).
-For CLI entry points and desktop/manual transitions, see [chat handoffs](chat-handoffs.md).
+See [privacy](../README.md#local-state-and-privacy) and [optional continuation tools](chat-handoffs.md).

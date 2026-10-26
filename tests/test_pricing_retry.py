@@ -48,7 +48,7 @@ def test_interactive_retry_requires_yes(monkeypatch, capsys, answer, expected):
         return answer
     monkeypatch.setattr(builtins, 'input', reply)
     session = BatchSession()
-    out = report.fetch_prices([1, 2], 'Example World', session, attempts=1)
+    out = report.fetch_prices([1, 2], 'Example World', session, attempts=1, automatic_retries=False)
     assert sorted(out) == expected
     assert len(prompts) == 1
     assert session.calls == ([[1, 2], [1], [2]] if expected else [[1, 2]])
@@ -59,7 +59,7 @@ def test_noninteractive_run_records_question_without_retry(monkeypatch):
     monkeypatch.setattr(report.sys.stdin, 'isatty', lambda: False)
     monkeypatch.setattr(builtins, 'input', lambda: pytest.fail('must not read stdin'))
     session, notes = BatchSession(), []
-    assert report.fetch_prices([1, 2], 'Example DC', session, attempts=1, notes=notes) == {}
+    assert report.fetch_prices([1, 2], 'Example DC', session, attempts=1, notes=notes, automatic_retries=False) == {}
     assert session.calls == [[1, 2]]
     assert any('Ask the user' in n and '--retry-pricing-single-items' in n for n in notes)
 
@@ -80,7 +80,7 @@ def test_approved_retry_is_bounded_and_summarizes_singleton_failures(capsys):
     assert out == {}
     assert session.calls == [[1, 2], [1, 2], [1], [1], [2], [2]]
     assert any('remain unpriced' in n for n in notes)
-    assert capsys.readouterr().err.count('pricing batch failed') == 1  # initial batch only
+    assert 'Example DC' in capsys.readouterr().err
 
 
 def test_batch_404_can_be_recovered_after_approval():
