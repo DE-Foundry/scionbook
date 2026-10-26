@@ -27,6 +27,12 @@ Finish the validation and reconciliation below before installing and reporting s
   missing quest history, balances, or retainer state. Switching an existing full setup to public mode must
   not erase its private history; retain it as explicitly historical, not fresh.
 
+Include all discovered retainers in authenticated syncs by default: levels, inventory, active listings,
+recent sales, and ventures. Skip them only when the player explicitly requests it; public mode cannot
+retrieve them. A pricing override does not itself authorize skipping retainers. Retainer equipment and
+average item level may require an in-game report: preserve dated reports separately from scraped data,
+and never present a null scraped item level as a measured value or erase a reported value because of it.
+
 Full command:
 `python3 scionbook_report.py --cookie-env --refresh-items --quest-pages 100 --recent-quests 0 --quest-mats-out .scionbook-tmp/quest_mats.json --out .scionbook-tmp/status.json --report .scionbook-tmp/cleanup.md`
 

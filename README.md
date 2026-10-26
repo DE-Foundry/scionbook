@@ -305,6 +305,12 @@ unestimated. If neither scope has a usable price, the item remains unknown. Othe
 selling destinations. Existing saved reports retain their old output until the next explicitly requested sync.
 Material protection must match confirmed or inferred unfinished quests and explicit crafting keeps.
 
+Authenticated syncs include all discovered retainers by default: levels, holdings, listings, recent sales,
+and ventures. Use `--no-retainers` only for an explicit player choice; public mode cannot retrieve these
+private pages. Retainer equipment/item levels may require an in-game report and are not established by
+a successful inventory sync. Gameplay planning defaults to level-appropriate ventures, checking actual
+equipment and venture requirements before suggesting upgrades; players can choose another goal.
+
 Sync timing and pricing requirements are personal settings in ignored `scionbook.json`, separate from
 gameplay priorities. Optional `preferences.sync.require_complete_pricing` is a boolean and defaults to true. When true, or
 when `--require-pricing` is passed, an authenticated run must receive valid item responses for every

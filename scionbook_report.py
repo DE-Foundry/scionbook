@@ -857,8 +857,8 @@ def parse_venture(soup):
 
 def scrape_retainer(char_id, rid, session, dump_dir=None, verbose=False):
     out = {"retainer_id": rid, "name": None, "job": None, "level": None,
-           # Null by design: retainer gear/ilvl does not exist outside the game
-           # client. The gap should read "not available", not "missing".
+           # Not exposed by Lodestone retainer pages. Equipment from an in-game
+           # or Companion-app report belongs in separately dated local state.
            "item_level": None, "active_venture": None,
            "inventory": [], "market_listings": [], "recent_sales": [],
            "sale_rows_dropped": 0,

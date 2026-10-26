@@ -60,6 +60,19 @@ Never commit or push player data, including to private branches. Sync only saves
 
 ## Inventory and market recommendations
 
+Authenticated syncs include all discovered retainers unless the player explicitly opts out. Include
+their levels, holdings, listings, recent sales, and ventures; public mode cannot supply private retainer
+data. Pricing exceptions do not imply permission to skip retainer collection.
+
+Unless the player chooses otherwise, include retainer upkeep in gameplay planning and aim to keep each
+retainer on ventures appropriate to its current level, respecting explicit player priorities and time.
+Establish its job, level, actual equipped gear/average item level, and the intended venture's requirements
+before recommending upgrades. If the source cannot supply equipment, obtain an in-game report rather
+than stopping at an unavailable-field notice or assuming level proves eligibility. Verify each exact
+item is retainer-equippable, consider suitable owned gear first, and keep dispatches/upgrades proposed
+until confirmed. Reported equipment stays in ignored local state with its date/source, not shared text
+or hand-edited scraper output.
+
 Check item market eligibility and known NPC sale value before requesting market prices. Explicit
 market-prohibited stacks need no market request; missing prices never prove an item is unsellable.
 Reduce failed pricing batches down to individual requests and reuse smaller successful sizes.
