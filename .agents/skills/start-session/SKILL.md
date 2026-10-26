@@ -28,6 +28,11 @@ Unknown data never establishes zero balances or no progress.
   when it materially changes the plan. Only unlocked activities are immediately runnable.
 - Use specialists when relevant; verify patch-sensitive mechanics and rewards. A queue, accepted quest,
   proposed purchase, or unlocked Savage duty is not a clear. Keep routines and longer progression distinct.
+- Unless the player opts out, consider retainer upkeep alongside the player's priorities: aim for ventures
+  appropriate to each retainer's current level. Check venture state, job, and actual equipment/item level;
+  follow [gear-planner](../gear-planner/SKILL.md) to establish missing gear evidence and venture gates.
+  Missing scraped item levels call for an in-game report, not an assumed value. Do not claim a dispatch
+  or gear upgrade occurred without confirmation.
 - Clear durable preferences and confirmed progress use [save-state](../save-state/SKILL.md) immediately.
   Discussion can explore possibilities without saving a decision. Use [tasks](../tasks/SKILL.md) for
   reports/next actions and [recap-session](../recap-session/SKILL.md) for a requested summary.
