@@ -38,7 +38,7 @@ from datetime import datetime, timezone
 
 import requests
 from bs4 import BeautifulSoup
-from scionbook_config import CONFIG_PATH, load_config, resolve_identity, resolve_mode
+from scionbook_config import CONFIG_PATH, load_config, parse_json, resolve_identity, resolve_mode
 from scionbook_http import LODESTONE, LODESTONE_HEADERS, HTTP_HEADERS
 
 BASE = f"{LODESTONE}/character"
@@ -1019,6 +1019,23 @@ def fetch_marketable(session):
         return None
 
 
+class PricingRetryConsent:
+    """One answer applies to singleton recovery in both pricing scopes."""
+
+    def __init__(self, decision=None):
+        self.decision = decision
+
+    def approve(self):
+        if self.decision is None and sys.stdin.isatty():
+            print("Pricing is incomplete. Retry missing home-World and DC prices "
+                  "in batches of 1? [y/N] ", end="", file=sys.stderr, flush=True)
+            try:
+                self.decision = input().strip().lower() in ("y", "yes")
+            except EOFError:
+                self.decision = False
+        return self.decision
+
+
 def pricing_item_ids(rows, marketable):
     """Only market-eligible item types need market prices; vendor values
     already come from the Lodestone tooltip. Unknown eligibility stays open
@@ -1030,7 +1047,8 @@ def pricing_item_ids(rows, marketable):
 
 
 def fetch_prices(ids, scope, session, chunk=50, listings=50, entries=50,
-                 attempts=3, coverage=None):
+                 attempts=3, coverage=None, retry_single_items=None, notes=None,
+                 retry_consent=None, absent_ids=None, automatic_retries=True):
     """Keep listings/history detail while reducing failed batches to singles.
 
     Learn the smaller batch size for the rest of this scope instead of
@@ -1039,7 +1057,13 @@ def fetch_prices(ids, scope, session, chunk=50, listings=50, entries=50,
     """
     if chunk < 1 or attempts < 1:
         raise ValueError("pricing chunk and attempts must be positive")
-    out, absent = {}, set()
+    out = {}
+    absent = absent_ids if absent_ids is not None else set()
+
+    def note(message):
+        print(f"  ! {message}", file=sys.stderr)
+        if notes is not None:
+            notes.append(message)
     ids = sorted(set(i for i in ids if i))
 
     def fetch_batch(batch, tries):
@@ -1074,38 +1098,66 @@ def fetch_prices(ids, scope, session, chunk=50, listings=50, entries=50,
                 time.sleep(1.5 * attempt)
         return False
 
-    batch_size = chunk
-    pending = ids[:]
-    processed = 0
-    while pending:
-        batch = pending[:batch_size]
-        ok = fetch_batch(batch, 1 if len(batch) > 1 else attempts)
-        if not ok and len(batch) > 1:
-            batch_size = max(1, len(batch) // 2)
-            print(f"  {scope}: reducing pricing batch size to {batch_size}",
-                  file=sys.stderr)
-            pending = [i for i in pending if i not in out and i not in absent]
-            continue
-        pending = pending[len(batch):]
-        processed += len(batch)
-        if processed >= 10 or not pending:
-            print(f"  {scope}: received {len(out)}/{len(ids)} item responses; "
-                  f"{len(pending)} left in first pass", file=sys.stderr)
-            processed = 0
-        time.sleep(0.3)
+    if automatic_retries and retry_single_items is None and retry_consent is None:
+        batch_size = chunk
+        pending = ids[:]
+        processed = 0
+        while pending:
+            batch = pending[:batch_size]
+            ok = fetch_batch(batch, 1 if len(batch) > 1 else attempts)
+            if not ok and len(batch) > 1:
+                batch_size = max(1, len(batch) // 2)
+                print(f"  {scope}: reducing pricing batch size to {batch_size}",
+                      file=sys.stderr)
+                pending = [i for i in pending if i not in out and i not in absent]
+                continue
+            pending = pending[len(batch):]
+            processed += len(batch)
+            if processed >= 10 or not pending:
+                print(f"  {scope}: received {len(out)}/{len(ids)} item responses; "
+                      f"{len(pending)} left in first pass", file=sys.stderr)
+                processed = 0
+            time.sleep(0.3)
 
-    for round_no in (1, 2):
+        for round_no in (1, 2):
+            missing = [i for i in ids if i not in out and i not in absent]
+            if not missing:
+                break
+            print(f"  {scope}: retrying {len(missing)} item(s) individually, "
+                  f"pass {round_no}...", file=sys.stderr)
+            for number, iid in enumerate(missing, 1):
+                fetch_batch([iid], attempts)
+                if number % 10 == 0 or number == len(missing):
+                    print(f"  {scope}: retry progress {number}/{len(missing)}; "
+                          f"received {len(out)}/{len(ids)}", file=sys.stderr)
+                time.sleep(0.2)
+
+    else:
+        for i in range(0, len(ids), chunk):
+            if not fetch_batch(ids[i:i + chunk], attempts):
+                time.sleep(1.0)
+            time.sleep(0.3)
+
+        # A slow item can time out its neighbours. Single-item requests can
+        # recover them, but potentially add many requests: ask before that work.
         missing = [i for i in ids if i not in out and i not in absent]
-        if not missing:
-            break
-        print(f"  {scope}: retrying {len(missing)} item(s) individually, "
-              f"pass {round_no}...", file=sys.stderr)
-        for number, iid in enumerate(missing, 1):
-            fetch_batch([iid], attempts)
-            if number % 10 == 0 or number == len(missing):
-                print(f"  {scope}: retry progress {number}/{len(missing)}; "
-                      f"received {len(out)}/{len(ids)}", file=sys.stderr)
-            time.sleep(0.2)
+        if missing and chunk > 1:
+            consent = retry_consent or PricingRetryConsent(retry_single_items)
+            approved = consent.approve()
+            if approved:
+                print(f"  retrying {len(missing)} unpriced item(s) in {scope}, "
+                      "batch size 1...",
+                      file=sys.stderr)
+                for iid in missing:
+                    fetch_batch([iid], attempts)
+                    time.sleep(0.2)
+            elif approved is None:
+                note(f"{scope}: smaller-batch pricing retry not performed. "
+                     "Ask the user whether to retry with batch size 1; after approval, "
+                     "use --pricing-only-from with --retry-pricing-single-items.")
+            else:
+                note(f"{scope}: smaller-batch pricing retry not approved; "
+                     "available results retained.")
 
     failed = [i for i in ids if i not in out and i not in absent]
     if coverage is not None:
@@ -1113,8 +1165,9 @@ def fetch_prices(ids, scope, session, chunk=50, listings=50, entries=50,
                         unavailable_item_ids=sorted(absent), failed_item_ids=failed,
                         complete=not failed and not absent)
     if failed or absent:
-        print(f"  ! {scope}: {len(failed)} failed and {len(absent)} unavailable "
-              "item(s) after individual lookups", file=sys.stderr)
+        note(f"{scope}: {len(failed)}/{len(ids)} item(s) remain unpriced; "
+             f"{len(absent)} unavailable. Missing prices do not establish "
+             "market prohibition or zero value.")
     return out
 
 
@@ -1834,6 +1887,10 @@ def build_report(data):
              "Retainers sell only on the character's home World. Other "
              "World/DC prices are references for comparison, buying, or "
              "provisional home-World listing prices, never selling destinations.", ""]
+    if data.get("pricing_recovery_at_utc"):
+        lines.extend([f"Pricing recovery attempted {data['pricing_recovery_at_utc']}. "
+                      "Character data keeps its original source time; retained price inputs "
+                      "are not refreshed.", ""])
     buckets = {}
     for r in data.get("all_rows", []):
         buckets.setdefault(r["verdict"], []).append(r)
@@ -2022,6 +2079,226 @@ def resolve_cookie(args):
     return cookie
 
 
+def pricing_coverage_notes(ids, world_px, dc_px, dc):
+    notes = []
+    if ids and len(dc_px) < 0.5 * len(ids):
+        notes.append(
+            f"DC pricing ({dc}) only resolved for {len(dc_px)}/{len(ids)} items, "
+            "likely Universalis load on the cross-world endpoint - comparison "
+            "data is incomplete; home-World selling estimates are unaffected.")
+    if ids and not world_px and not dc_px:
+        message = ("Universalis returned no data for any item. Market estimates "
+                   "unavailable; only known vendor values are retained. Missing "
+                   "prices are not evidence to discard. Check connectivity and re-run.")
+        notes.append(message)
+        print(message, file=sys.stderr)
+    return notes
+
+
+def vendor_candidates(rows, world_px, dc_px):
+    candidates = set()
+    for row in rows:
+        iid = row.get("item_id")
+        hq = bool(row.get("hq"))
+        price, _, _, _ = pick_unit_price(world_px.get(iid), hq)
+        if not price:
+            price, _, _, _ = pick_unit_price(dc_px.get(iid), hq)
+        if price and price > 1000:
+            candidates.add(iid)
+    return sorted(candidates)
+
+
+def saved_price_inputs(prices):
+    """Keep only numeric pricing inputs and HQ/price samples, never identities."""
+    numeric_fields = tuple(stem + suffix
+                           for stem in ("averagePrice", "currentAveragePrice", "minPrice")
+                           for suffix in ("", "NQ", "HQ")) + (
+                               "listingsCount", "nqSaleVelocity", "hqSaleVelocity",
+                               "regularSaleVelocity")
+    out = {}
+    for iid, entry in prices.items():
+        if not isinstance(entry, dict):
+            raise ValueError("Invalid saved pricing entry.")
+        kept = {key: entry[key] for key in numeric_fields
+                if type(entry.get(key)) in (int, float)}
+        for key in ("listings", "recentHistory"):
+            if isinstance(entry.get(key), list):
+                kept[key] = [
+                    {field: value for field, value in sample.items()
+                     if (field == "hq" and type(value) is bool)
+                     or (field == "pricePerUnit" and type(value) in (int, float))}
+                    for sample in entry[key] if isinstance(sample, dict)]
+        out[iid] = kept
+    return out
+
+
+def saved_inventory_inputs(rows):
+    """Inputs needed for verdicts, protections, and report grouping."""
+    fields = ("name", "item_id", "quantity", "hq", "vendor_price", "market_allowed", "retainer")
+    return [{key: row[key] for key in fields if key in row} for row in rows]
+
+
+def recover_pricing(args):
+    """Recover only missing prices; never authenticate or refresh player sources."""
+    data = parse_json(pathlib.Path(args.pricing_only_from).read_text(encoding="utf-8"))
+    if not isinstance(data, dict) or (
+            data.get("character_id"), data.get("world"), data.get("data_center")) != (
+                args.id, args.world, args.dc):
+        raise ValueError("Pricing source identity differs from configuration/explicit identity.")
+    context = data.get("pricing_context")
+    if (not isinstance(context, dict) or context.get("version") != 1
+            or not isinstance(data.get("fetched_at_utc"), str)
+            or context.get("source_fetched_at_utc") != data.get("fetched_at_utc")):
+        raise ValueError("Snapshot has no matching pricing recovery context. "
+                         "Use a snapshot from a separately authorized full sync with this version.")
+    rows = saved_inventory_inputs(context["input_rows"])
+    marketable = context["marketable"]
+    marketable = None if marketable is None else set(marketable)
+    ids = context["pricing_ids"]
+    prices = [saved_price_inputs({int(key): value for key, value in context[name].items()})
+              for name in ("world_prices", "dc_prices")]
+    absent = [set(context[name]) for name in ("world_absent", "dc_absent")]
+    vendor_buy = {int(key): value for key, value in context["vendor_buy"].items()}
+    protected = set(context["protected_materials"])
+    previous_notes, by_name = context["notes"], context["by_name"]
+    min_gil = context["effective_min_gil"]
+    if (not isinstance(ids, list) or any(type(iid) is not int or iid <= 0 for iid in ids)
+            or not isinstance(min_gil, (int, float)) or min_gil < 0
+            or not isinstance(by_name, dict) or not isinstance(previous_notes, list)
+            or any(not isinstance(name, str) for name in protected)
+            or not isinstance(data.get("retainers"), list)
+            or any(not isinstance(row.get("name"), str) for row in rows)):
+        raise ValueError("Invalid pricing recovery context.")
+    # Validate the recovery inputs before creating a network session.
+    session = requests.Session()
+    session.headers.update(HTTP_HEADERS)
+    notes, recovered = [], set()
+    for scope, px, missing_404 in zip((args.world, args.dc), prices, absent):
+        missing = [iid for iid in ids if iid not in px and iid not in missing_404]
+        found = fetch_prices(missing, scope, session, chunk=1,
+                             retry_single_items=False, notes=notes, absent_ids=missing_404)
+        px.update(found)
+        recovered.update(found)
+    world_px, dc_px = prices
+    candidates = [iid for iid in vendor_candidates(rows, world_px, dc_px) if iid in recovered]
+    if candidates:
+        vendor_buy.update(fetch_vendor_buy_prices(candidates, session, candidates=candidates))
+    for row in rows:
+        row.update(verdict_for(row, world_px, dc_px, marketable,
+                               min_gil, args.world, args.dc,
+                               vendor_buy=vendor_buy))
+    apply_quest_material_protection(rows, protected)
+    apply_never_discard_protection(rows)
+    data["all_rows"] = rows
+    notes.extend(pricing_coverage_notes(ids, world_px, dc_px, args.dc))
+    # Only replace notes owned by the pricing pass. Private-page/protection
+    # findings remain attributed to the original character fetch.
+    data["notes"] = [note for note in data.get("notes", []) if note not in previous_notes] + notes
+    context.update(world_prices=saved_price_inputs(world_px), dc_prices=saved_price_inputs(dc_px),
+                   input_rows=saved_inventory_inputs(rows), vendor_buy=vendor_buy,
+                   world_absent=sorted(absent[0]), dc_absent=sorted(absent[1]), notes=notes)
+    data["pricing_recovery_at_utc"] = datetime.now(timezone.utc).isoformat()
+    calibration = calibrate_against_sales(data["retainers"], world_px, by_name)
+    coverage = {
+        "eligible_item_ids": ids,
+        "unresolved_names": sorted({row["name"] for row in rows
+            if not row.get("item_id") and row.get("market_allowed") is not False}),
+        "market_prohibited_stacks": sum(row.get("market_allowed") is False for row in rows),
+        "vendor_valued_stacks": sum(bool(row.get("vendor_price")) for row in rows)}
+    for name, px, missing_404 in zip(("world", "data_center"), prices, absent):
+        failed = sorted(set(ids) - set(px) - missing_404)
+        coverage[name] = {"requested_item_ids": ids, "returned_item_ids": sorted(px),
+                          "unavailable_item_ids": sorted(missing_404),
+                          "failed_item_ids": failed, "complete": not failed and not missing_404}
+    coverage["complete"] = (not coverage["unresolved_names"] and
+                            all(coverage[name]["complete"] for name in ("world", "data_center")))
+    data["pricing_coverage"] = coverage
+    if args.mode == "full" and args.require_pricing and not coverage["complete"]:
+        sys.exit("Required pricing is incomplete. No recovered outputs were replaced; "
+                 "retry or explicitly accept gaps with --allow-partial-pricing.")
+    refresh_inventory_report(data, calibration)
+    write_report_outputs(data, args)
+
+
+def refresh_inventory_report(data, calibration):
+    sellable_tags = ("sell", "sell_slow")
+    optimistic_total = round(sum(r.get("est_value_optimistic") or 0
+                                 for r in data["all_rows"]
+                                 if r.get("verdict") in sellable_tags))
+    realistic_total = round(sum(r.get("est_value") or 0
+                                for r in data["all_rows"]
+                                if r.get("verdict") in sellable_tags))
+    slots_total = len(data["retainers"]) * MARKET_SLOTS_PER_RETAINER
+    # Slot capacity is per-retainer, so a listable stack only counts toward
+    # the plan if its own retainer still has room - counting them globally
+    # reports a plan larger than build_report can actually lay out.
+    _room = {ret.get("name"): max(0, MARKET_SLOTS_PER_RETAINER
+                                  - len(ret.get("market_listings") or []))
+             for ret in data["retainers"]}
+    listable_now = 0
+    for r in data["all_rows"]:
+        if r.get("verdict") != "sell":
+            continue
+        who = r.get("retainer")
+        if who in _room:
+            if _room[who] <= 0:
+                continue
+            _room[who] -= 1
+        listable_now += 1
+    data["summary"] = {
+        "retainers": len(data["retainers"]),
+        "distinct_stacks": len(data["all_rows"]),
+        "unresolved_names": sum(1 for r in data["all_rows"]
+                                if not r.get("item_id")),
+        # Headline figure is the depth-capped realistic total, not a naive
+        # sum of (best current price x full quantity) - see verdict_for.
+        "estimated_recoverable_gil": realistic_total,
+        "estimated_recoverable_gil_optimistic": optimistic_total,
+        "market_slots_total": slots_total,
+        # Two different numbers, previously conflated under one misleading
+        # name ("market_slots_used", which read as "your board is full" when
+        # it actually meant "the plan wants this many slots" - it reported
+        # 40/40 on 2026-09-03 with both retainers listing nothing at all).
+        # occupied = what is actually on the board right now.
+        "market_slots_occupied": sum(len(ret.get("market_listings") or [])
+                                     for ret in data["retainers"]),
+        # planned = how many slots the "list right now" plan actually fills.
+        # Capped by *free* slots, not the theoretical total - you cannot list
+        # into a slot that already has something in it, and reporting 40
+        # here against a 15-item plan (as this did while occupancy was stuck
+        # at 0) contradicts the report it is supposed to summarise.
+        "market_slots_planned": min(
+            listable_now,
+            max(0, slots_total - sum(len(ret.get("market_listings") or [])
+                                     for ret in data["retainers"]))),
+        "suspect_price_rows": sum(1 for r in data["all_rows"]
+                                  if r.get("price_suspect")),
+    }
+    data["report_md"] = build_report(data) if data["all_rows"] else None
+    data["pricing_calibration"] = calibration
+
+    data["still_not_available"] = derive_still_not_available(data)
+
+
+def write_report_outputs(data, args):
+    text = json.dumps(data, indent=None if args.compact else 2,
+                      ensure_ascii=False)
+    pathlib.Path(args.out).write_text(text + "\n", encoding="utf-8")
+    if args.report:
+        pathlib.Path(args.report).write_text(data["report_md"] or "", encoding="utf-8")
+    print(json.dumps(data["summary"], indent=2))
+    if data.get("pricing_calibration"):
+        print("\npricing vs this character's own realised sales "
+             "(largest residual first):", file=sys.stderr)
+        for r in data["pricing_calibration"][:15]:
+            print(f"  {r['name']}{' (HQ)' if r['hq'] else ''}: "
+                 f"estimated {r['estimated_unit_price']:,} vs realised "
+                 f"{r['realized_unit_price']:,} "
+                 f"({r['residual_pct']:+.0f}%, source={r['price_source']})",
+                 file=sys.stderr)
+    print(f"wrote {args.out}", file=sys.stderr)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default=str(CONFIG_PATH))
@@ -2037,7 +2314,7 @@ def main():
                       help="override configured mode for this run; explicit identity defaults to full")
     mode.add_argument("--anon", dest="mode", action="store_const", const="public",
                       help="alias for --mode public")
-    ap.add_argument("--out", metavar="FILE", default="status.json")
+    ap.add_argument("--out", metavar="FILE")
     ap.add_argument("--report", metavar="FILE",
                     help="also write the cleanup report as standalone markdown")
     ap.add_argument("--dump", metavar="DIR", help="save raw HTML for debugging")
@@ -2048,6 +2325,12 @@ def main():
                     help="skip achievements and collections")
     ap.add_argument("--no-retainers", action="store_true")
     ap.add_argument("--no-pricing", action="store_true")
+    ap.add_argument("--pricing-batch-size", type=int, metavar="N",
+                    help="items per request in both pricing scopes (default: World 50, DC 4)")
+    ap.add_argument("--retry-pricing-single-items", action=argparse.BooleanOptionalAction,
+                    default=None, help="allow/decline bounded singleton retries; unset keeps automatic retries")
+    ap.add_argument("--pricing-only-from", metavar="FILE",
+                    help="recover missing prices from a saved snapshot without scraping Lodestone")
     pricing = ap.add_mutually_exclusive_group()
     pricing.add_argument("--require-pricing", dest="require_pricing", action="store_true",
                          default=None, help="require complete responses in both pricing scopes (default)")
@@ -2074,6 +2357,24 @@ def main():
                     help="don't apply quest-material protection even if "
                          "--quest-mats resolves to a real file")
     args = ap.parse_args()
+    if args.pricing_batch_size is not None and args.pricing_batch_size < 1:
+        ap.error("--pricing-batch-size must be at least 1")
+    if args.pricing_only_from:
+        if args.retry_pricing_single_items is not True:
+            ap.error("--pricing-only-from requires --retry-pricing-single-items after approval")
+        if not args.out:
+            ap.error("--pricing-only-from requires a separate staged --out path")
+        if pathlib.Path(args.out).resolve() == pathlib.Path(args.pricing_only_from).resolve():
+            ap.error("pricing recovery --out must differ from its source; preserve the prior snapshot")
+        if args.report and pathlib.Path(args.report).resolve() in {
+                pathlib.Path(args.pricing_only_from).resolve(), pathlib.Path(args.out).resolve()}:
+            ap.error("pricing recovery --report must differ from its source and --out")
+        if args.no_pricing or args.no_retainers or args.pricing_batch_size not in (None, 1):
+            ap.error("pricing-only recovery uses batch size 1 and cannot skip pricing/retainers")
+    else:
+        args.out = args.out or "status.json"
+    if args.pricing_batch_size is not None:
+        args.price_world_chunk = args.price_dc_chunk = args.pricing_batch_size
     if args.price_world_chunk < 1 or args.price_dc_chunk < 1:
         ap.error("pricing chunk sizes must be positive")
 
@@ -2091,6 +2392,13 @@ def main():
         ap.error(str(exc))
     if args.mode == "full" and args.require_pricing and (args.no_pricing or args.no_retainers):
         ap.error("complete pricing conflicts with --no-pricing or --no-retainers")
+
+    if args.pricing_only_from:
+        try:
+            recover_pricing(args)
+        except (ValueError, OSError, KeyError, TypeError) as exc:
+            ap.error(f"Pricing recovery failed: {exc}")
+        return
 
     cookie = resolve_cookie(args)
     HEADERS.pop("Cookie", None)
@@ -2268,6 +2576,8 @@ def main():
                              est_value=None)
             else:
                 print("pricing against Universalis...", file=sys.stderr)
+                input_rows = saved_inventory_inputs(rows)
+                pricing_notes = []
                 # min_gil is a floor worth having when slots are contested -
                 # with 40/40 full, a 940g item genuinely isn't worth bumping
                 # something better. But it makes no sense as a flat constant
@@ -2297,12 +2607,14 @@ def main():
                         f"{MIN_GIL_NUISANCE_FLOOR:,}g - not worth listing "
                         "regardless of slot pressure).")
                 marketable = fetch_marketable(session)
-                ids = sorted({r["item_id"] for r in rows if r["item_id"]})
                 if marketable is None:
                     notes.append("Universalis marketable list unavailable; "
-                                 "trying all resolved IDs. Missing prices do "
+                                 "trying resolved IDs without a known market prohibition. Missing prices do "
                                  "not establish that an item is untradeable.")
                 pricing_ids = pricing_item_ids(rows, marketable)
+                consent = (PricingRetryConsent(args.retry_pricing_single_items)
+                           if args.retry_pricing_single_items is not None else None)
+                world_absent, dc_absent = set(), set()
                 data["pricing_coverage"] = {
                     "eligible_item_ids": pricing_ids,
                     "unresolved_names": sorted({r["name"] for r in rows
@@ -2312,7 +2624,9 @@ def main():
                     "world": {}, "data_center": {}}
                 world_px = fetch_prices(pricing_ids, args.world, session,
                                         chunk=args.price_world_chunk,
-                                        coverage=data["pricing_coverage"]["world"])
+                                        coverage=data["pricing_coverage"]["world"],
+                                        retry_consent=consent, notes=pricing_notes,
+                                        absent_ids=world_absent)
                 # DC scope aggregates every world in the DC and is much
                 # more prone to 504s under load than a single-world query
                 # at the same size (confirmed live, 2026-08-28) - smaller
@@ -2327,25 +2641,17 @@ def main():
                 dc_px = fetch_prices(pricing_ids, args.dc, session,
                                      chunk=args.price_dc_chunk,
                                      listings=50, entries=50, attempts=3,
-                                     coverage=data["pricing_coverage"]["data_center"])
+                                     coverage=data["pricing_coverage"]["data_center"],
+                                     retry_consent=consent, notes=pricing_notes,
+                                     absent_ids=dc_absent)
                 data["pricing_coverage"]["complete"] = (
                     not data["pricing_coverage"]["unresolved_names"] and
                     all(data["pricing_coverage"][scope]["complete"]
                         for scope in ("world", "data_center")))
-                if pricing_ids and len(dc_px) < 0.5 * len(pricing_ids):
-                    notes.append(
-                        f"DC pricing ({args.dc}) only resolved for "
-                        f"{len(dc_px)}/{len(pricing_ids)} items this run, "
-                        "likely Universalis load on the cross-world "
-                        "endpoint - comparison data is incomplete; "
-                        "home-World selling estimates are unaffected.")
+                pricing_notes.extend(pricing_coverage_notes(pricing_ids, world_px, dc_px, args.dc))
+                vendor_buy = {}
                 # Missing market data does not erase known vendor value.
                 if pricing_ids and not world_px and not dc_px:
-                    notes.append("Universalis returned no data for any item. "
-                                 "Market estimates unavailable; only known vendor "
-                                 "values are retained. Missing prices are not "
-                                 "evidence to discard. Check connectivity and re-run.")
-                    print(notes[-1], file=sys.stderr)
                     for r in rows:
                         r.update(verdict_for(r, {}, {}, marketable,
                                              effective_min_gil, args.world,
@@ -2353,27 +2659,31 @@ def main():
                 else:
                     # Check NPC availability for valuable home prices and DC
                     # references alike. Shop prices warn; they do not cap.
-                    candidates = []
-                    for r in rows:
-                        iid = r.get("item_id")
-                        if not iid:
-                            continue
-                        px, _, _, _ = pick_unit_price(world_px.get(iid),
-                                                      bool(r.get("hq")))
-                        if not px:
-                            px, _, _, _ = pick_unit_price(dc_px.get(iid),
-                                                         bool(r.get("hq")))
-                        if px and px > 1000:
-                            candidates.append(iid)
+                    candidates = vendor_candidates(rows, world_px, dc_px)
                     print("checking NPC vendor ceilings...", file=sys.stderr)
                     vendor_buy = fetch_vendor_buy_prices(
-                        ids, session, candidates=candidates)
+                        pricing_ids, session, candidates=candidates)
                     for r in rows:
                         r.update(verdict_for(r, world_px, dc_px, marketable,
                                              effective_min_gil, args.world,
                                              args.dc, vendor_buy=vendor_buy))
                     calibration = calibrate_against_sales(
                         data["retainers"], world_px, by_name)
+                names = {(row.get("name") or "").strip().lower()
+                         for ret in data["retainers"] for row in ret.get("recent_sales", [])}
+                data["pricing_context"] = {
+                    "version": 1, "source_fetched_at_utc": data["fetched_at_utc"],
+                    "input_rows": input_rows, "pricing_ids": pricing_ids,
+                    "marketable": (None if marketable is None else sorted({
+                        row["item_id"] for row in rows if row.get("item_id") in marketable})),
+                    "world_prices": saved_price_inputs(world_px),
+                    "dc_prices": saved_price_inputs(dc_px),
+                    "world_absent": sorted(world_absent), "dc_absent": sorted(dc_absent),
+                    "vendor_buy": vendor_buy, "effective_min_gil": effective_min_gil,
+                    "by_name": {name: by_name[name] for name in names if name in by_name},
+                    "notes": pricing_notes}
+                notes.extend(pricing_notes)
+        protected = set()
         if not args.no_quest_mats:
             protected = ({n.strip().lower() for n in quest_protection["protected_materials"]}
                          if quest_protection is not None else load_protected_materials(args.quest_mats))
@@ -2393,6 +2703,8 @@ def main():
             print(f"protected {never_discard_count} leveling XP-boost "
                  "item(s) (Engineering/Survival Manuals)", file=sys.stderr)
         data["all_rows"] = rows
+        if "pricing_context" in data:
+            data["pricing_context"]["protected_materials"] = sorted(protected)
         if (not rows and not args.no_pricing and data["retainers"]
                 and all("baggage/" in ret.get("pages_ok", [])
                         and not ret.get("pages_missing") for ret in data["retainers"])):
@@ -2423,63 +2735,7 @@ def main():
                 "quantity != total, so the Sale Inventory cell order may "
                 "have changed - market_slots_occupied may be wrong.")
 
-    sellable_tags = ("sell", "sell_slow")
-    optimistic_total = round(sum(r.get("est_value_optimistic") or 0
-                                 for r in data["all_rows"]
-                                 if r.get("verdict") in sellable_tags))
-    realistic_total = round(sum(r.get("est_value") or 0
-                                for r in data["all_rows"]
-                                if r.get("verdict") in sellable_tags))
-    slots_total = len(data["retainers"]) * MARKET_SLOTS_PER_RETAINER
-    # Slot capacity is per-retainer, so a listable stack only counts toward
-    # the plan if its own retainer still has room - counting them globally
-    # reports a plan larger than build_report can actually lay out.
-    _room = {ret.get("name"): max(0, MARKET_SLOTS_PER_RETAINER
-                                  - len(ret.get("market_listings") or []))
-             for ret in data["retainers"]}
-    listable_now = 0
-    for r in data["all_rows"]:
-        if r.get("verdict") != "sell":
-            continue
-        who = r.get("retainer")
-        if who in _room:
-            if _room[who] <= 0:
-                continue
-            _room[who] -= 1
-        listable_now += 1
-    data["summary"] = {
-        "retainers": len(data["retainers"]),
-        "distinct_stacks": len(data["all_rows"]),
-        "unresolved_names": sum(1 for r in data["all_rows"]
-                                if not r.get("item_id")),
-        # Headline figure is the depth-capped realistic total, not a naive
-        # sum of (best current price x full quantity) - see verdict_for.
-        "estimated_recoverable_gil": realistic_total,
-        "estimated_recoverable_gil_optimistic": optimistic_total,
-        "market_slots_total": slots_total,
-        # Two different numbers, previously conflated under one misleading
-        # name ("market_slots_used", which read as "your board is full" when
-        # it actually meant "the plan wants this many slots" - it reported
-        # 40/40 on 2026-09-03 with both retainers listing nothing at all).
-        # occupied = what is actually on the board right now.
-        "market_slots_occupied": sum(len(ret.get("market_listings") or [])
-                                     for ret in data["retainers"]),
-        # planned = how many slots the "list right now" plan actually fills.
-        # Capped by *free* slots, not the theoretical total - you cannot list
-        # into a slot that already has something in it, and reporting 40
-        # here against a 15-item plan (as this did while occupancy was stuck
-        # at 0) contradicts the report it is supposed to summarise.
-        "market_slots_planned": min(
-            listable_now,
-            max(0, slots_total - sum(len(ret.get("market_listings") or [])
-                                     for ret in data["retainers"]))),
-        "suspect_price_rows": sum(1 for r in data["all_rows"]
-                                  if r.get("price_suspect")),
-    }
-    data["report_md"] = build_report(data) if data["all_rows"] else None
-    data["pricing_calibration"] = calibration
-
-    data["still_not_available"] = derive_still_not_available(data)
+    refresh_inventory_report(data, calibration)
 
     if not character.get("name"):
         notes.append("profile selectors likely changed - rerun with --dump")
@@ -2498,22 +2754,7 @@ def main():
     if quest_protection is not None:
         from crafting_protection import write_json
         write_json(args.quest_mats_out or args.quest_mats, quest_protection)
-    text = json.dumps(data, indent=None if args.compact else 2,
-                      ensure_ascii=False)
-    pathlib.Path(args.out).write_text(text + "\n", encoding="utf-8")
-    if args.report:
-        pathlib.Path(args.report).write_text(data["report_md"] or "", encoding="utf-8")
-    print(json.dumps(data["summary"], indent=2))
-    if data.get("pricing_calibration"):
-        print("\npricing vs this character's own realised sales "
-             "(largest residual first):", file=sys.stderr)
-        for r in data["pricing_calibration"][:15]:
-            print(f"  {r['name']}{' (HQ)' if r['hq'] else ''}: "
-                 f"estimated {r['estimated_unit_price']:,} vs realised "
-                 f"{r['realized_unit_price']:,} "
-                 f"({r['residual_pct']:+.0f}%, source={r['price_source']})",
-                 file=sys.stderr)
-    print(f"wrote {args.out}", file=sys.stderr)
+    write_report_outputs(data, args)
 
 
 if __name__ == "__main__":

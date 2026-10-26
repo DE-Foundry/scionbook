@@ -970,13 +970,15 @@ class _FakeSession:
         return _FakeResp(200, {"items": {str(i): {"itemID": i} for i in ids}})
 
 
-def test_fetch_prices_sweeps_items_lost_to_a_slow_neighbour(monkeypatch):
+def test_fetch_prices_recovers_items_lost_to_a_slow_neighbour_after_approval(monkeypatch):
     """One slow item times out the whole batch it shares. The neighbours are
-    recoverable one at a time - without the sweep they are silently unpriced."""
+    recoverable one at a time when the user approves the smaller-batch retry."""
     monkeypatch.setattr(fr.time, "sleep", lambda *_: None)
     sess = _FakeSession(slow_ids=[3])
-    out = fr.fetch_prices([1, 2, 3, 4], "Example DC", sess, chunk=4, attempts=1)
+    out = fr.fetch_prices([1, 2, 3, 4], "Example DC", sess, chunk=4, attempts=1,
+                          retry_single_items=True)
     assert set(out) == {1, 2, 3, 4}
+    assert sess.calls == [[1, 2, 3, 4], [1], [2], [3], [4]]
 
 
 def test_fetch_prices_does_not_retry_a_404(monkeypatch):

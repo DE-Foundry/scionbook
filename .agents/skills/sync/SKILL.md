@@ -56,6 +56,21 @@ individual retries pause the full-pricing sync; preserve canonical files and let
 next step. An explicit ignore choice permits partial pricing with failed items/scopes shown as unknown,
 never zero. Other authentication, identity, history, and protection validation still applies.
 
+When the user explicitly accepts a partial staged snapshot, it includes pricing recovery context.
+After approval, recover only missing prices with:
+
+`python3 scionbook_report.py --pricing-only-from .scionbook-tmp/status.json --retry-pricing-single-items --out .scionbook-tmp/status-priced.json --report .scionbook-tmp/cleanup-priced.md`
+
+This needs no cookie and does not scrape Lodestone or reconcile history/crafting. It preserves the
+character source timestamp, successful prices, and saved protections, and records pricing recovery time
+separately. Full pricing remains required unless explicitly overridden. A failed full-pricing refresh
+does not write a new recovery source: never mistake an older staged file for that failed run. Validate
+source identity, context timestamp, pricing_coverage, and snapshot/report agreement before installation.
+Keep the original snapshot/report and matching history/protections until the recovered pair validates.
+Use --allow-partial-pricing only for an explicit choice to accept remaining gaps. Older snapshots without
+recovery context need a separately authorized new sync. The --no-retry-pricing-single-items option can
+explicitly disable automatic fallback; it does not waive the complete-pricing requirement.
+
 Before replacing anything, verify configured character ID/name/home world/data center, actual fresh
 fetched_at_utc, parsed profile and jobs, notes, and still_not_available. A cookie-presence authenticated flag
 is not sufficient. Full mode requires private quest/currency evidence, a known quest total equal to

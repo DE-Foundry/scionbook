@@ -1,5 +1,14 @@
 ## Changes and compatibility
 
+Pricing-only recovery can now fill missing prices from an explicitly accepted partial snapshot
+without re-scraping character data. Existing complete-pricing defaults and automatic batch reduction
+remain intact. Recovery requires approval and matching versioned context; existing snapshots remain
+readable without migration. New recovery outputs preserve character source time and saved protections,
+record attempt time separately, and recompute coverage before writing. Retain the original staged
+snapshot/report with matching history/protections until validation; roll back using that original set.
+Saved price inputs exclude third-party identities and unused response metadata, including when trimming
+an earlier raw recovery context. See README.md for commands, validation, and partial-coverage overrides.
+
 The player workflow now stays in one conversation across setup, sync, discussion, planning, and local
 saves. Clear standing preferences and confirmed reports save immediately through save-state; recaps
 and fresh chats are optional. Interactive Session launchers now request write access with normal host

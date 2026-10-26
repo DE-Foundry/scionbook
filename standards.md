@@ -92,6 +92,14 @@ Missing market prices do not erase a known vendor sale value. Compare provisiona
 vendor proceeds too; any resulting proceeds estimate is vendor-only. NPC purchase prices trigger a warning
 for either price source, never an automatic cap, because shop access may be gated.
 
+Approved pricing-only recovery reuses saved snapshot context, successful prices, vendor values,
+and material protections. Preserve character source time, record recovery time separately, and recompute
+coverage under the current full-pricing default before writing. Never rescrape character/history/crafting
+merely to fill missing prices. A failed full-pricing run writes no new recovery source; use a previously
+accepted partial snapshot only with its actual provenance. Explicit retry declines suppress fallback
+without silently accepting gaps. Persist numeric valuation inputs and HQ/unit-price samples only,
+excluding third-party identities and unused metadata; trim legacy raw contexts in recovered outputs.
+
 ## Credentials and output
 
 Use LODESTONE_COOKIE from the process environment or hidden terminal input. Never print, log, save,

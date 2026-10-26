@@ -326,6 +326,29 @@ after individual retries, preserve the prior files and report the incomplete run
 remaining gaps. The override still requests prices and keeps available responses; failed prices remain
 unknown. It never changes the saved default. Do not reduce coverage solely to shorten execution. `--price-world-chunk` and `--price-dc-chunk` set initial batch sizes.
 
+### Recover missing prices without refreshing the character
+
+Snapshots produced after explicitly accepting partial pricing include a versioned pricing recovery
+context. After approval, run:
+
+```bash
+python3 scionbook_report.py --pricing-only-from .scionbook-tmp/status.json --retry-pricing-single-items --out .scionbook-tmp/status-priced.json --report .scionbook-tmp/cleanup-priced.md
+```
+
+Recovery requests only missing prices in a bounded singleton pass. It needs no cookie, retains successful
+prices, known vendor values and saved protections, and preserves fetched_at_utc. The separate
+pricing_recovery_at_utc records the attempt. Recovered pricing_coverage is recomputed for both scopes;
+incomplete required coverage leaves prior outputs untouched. Use --allow-partial-pricing only when
+explicitly accepting remaining gaps. Failed full-pricing refreshes do not produce a new recovery source.
+Never reuse a stale staged file as though it came from the failed run. Retain the original snapshot/report
+and matching history/protection files until the recovered pair is validated, then install them together.
+Older snapshots remain readable but need a separately authorized refresh to gain recovery context.
+
+Stored prices contain only numeric valuation inputs and HQ/unit-price samples, excluding third-party
+names/IDs and unused metadata; recovery also trims legacy raw contexts without modifying the source.
+--pricing-batch-size sets both scope sizes; the existing per-scope flags remain available.
+--no-retry-pricing-single-items explicitly disables automatic fallback without relaxing coverage.
+
 ## Optional quest-material protection
 
 Crafting materials are saved data, not conversation context. `quest_turnins.json` version 2 records
